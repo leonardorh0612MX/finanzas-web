@@ -6,7 +6,7 @@
 (function () {
   "use strict";
 
-  const STORAGE_KEY = "finanzas_store_v1";
+  const STORAGE_KEY = "finanzas_store_v2";
   const HOY = new Date(2026, 4, 31); // 31 may 2026 (mes 0-indexed: 4 = mayo)
   const MES_ACTUAL = HOY.getMonth() + 1; // 5
   const ANIO_ACTUAL = HOY.getFullYear(); // 2026
@@ -223,7 +223,7 @@
 
   function reset() {
     localStorage.removeItem(STORAGE_KEY);
-    DB = seed();
+    DB = emptyStore();
     save(DB);
   }
   function nextId() { return DB._nextId++; }
