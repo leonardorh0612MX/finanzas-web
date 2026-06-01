@@ -15,6 +15,7 @@ const TABS = [
   { id: "deudas", label: "Deudas", icon: "debt" },
   { id: "metas", label: "Metas", icon: "goal" },
   { id: "cuentas", label: "Cuentas", icon: "wallet" },
+  { id: "config", label: "Configuración", icon: "settings" },
 ];
 
 function Logo() {
@@ -56,6 +57,7 @@ function App() {
     deudas: <Deudas />,
     metas: <Metas />,
     cuentas: <Cuentas />,
+    config: <Config />,
   };
 
   return (

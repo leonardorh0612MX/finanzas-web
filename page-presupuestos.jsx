@@ -18,7 +18,7 @@ function PresupuestoForm({ initial, mes, anio, onClose }) {
   return (
     <>
       <Field label="Nombre" error={err.nombre}><TextInput value={f.nombre} onChange={set("nombre")} placeholder="Ej. Comida del mes" /></Field>
-      <Field label="Categoría" hint="El gasto se calcula con las transacciones de esta categoría"><Select value={f.categoria} onChange={set("categoria")} options={S.CATEGORIAS} /></Field>
+      <Field label="Categoría" hint="El gasto se calcula con las transacciones de esta categoría"><Select value={f.categoria} onChange={set("categoria")} options={S.getCategorias()} /></Field>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         <Field label="Mes"><Select value={f.mes} onChange={(v) => set("mes")(+v)} options={Array.from({ length: 12 }, (_, i) => ({ value: i + 1, label: S.nombreMes[i + 1] }))} /></Field>
         <Field label="Año"><TextInput type="number" mono value={f.anio} onChange={(v) => set("anio")(+v)} /></Field>

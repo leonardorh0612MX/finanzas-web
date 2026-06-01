@@ -34,7 +34,7 @@ function TransaccionForm({ initial, onClose }) {
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           <Field label="Monto (MXN)" error={err.monto}><TextInput type="number" mono value={f.monto} onChange={set("monto")} placeholder="0.00" /></Field>
-          <Field label="Categoría"><Select value={f.categoria} onChange={set("categoria")} options={S.CATEGORIAS} /></Field>
+          <Field label="Categoría"><Select value={f.categoria} onChange={set("categoria")} options={S.getCategorias()} /></Field>
         </div>
         <Field label="Cuenta"><Select value={f.cuenta} onChange={set("cuenta")} placeholder="— Selecciona —" options={cuentas.map((c) => ({ value: c.id, label: `${c.nombre} · ${c.tipo}` }))} /></Field>
         {f.tipo === "Pago de deuda" && (
@@ -108,7 +108,7 @@ function Transacciones() {
           <div style={{ width: 120 }}><Select value={filtros.mes} onChange={(v) => setFil("mes")(+v)} options={[{ value: 0, label: "Todo el año" }, ...Array.from({ length: 12 }, (_, i) => ({ value: i + 1, label: S.nombreMes[i + 1] }))]} /></div>
           <div style={{ width: 100 }}><Select value={filtros.anio} onChange={(v) => setFil("anio")(+v)} options={anios.map((a) => ({ value: a, label: a }))} /></div>
           <div style={{ width: 150 }}><Select value={filtros.tipo} onChange={setFil("tipo")} options={["Todos", ...S.TIPOS]} /></div>
-          <div style={{ width: 150 }}><Select value={filtros.categoria} onChange={setFil("categoria")} options={["Todas", ...S.CATEGORIAS]} /></div>
+          <div style={{ width: 150 }}><Select value={filtros.categoria} onChange={setFil("categoria")} options={["Todas", ...S.getCategorias()]} /></div>
         </div>
       </Card>
 

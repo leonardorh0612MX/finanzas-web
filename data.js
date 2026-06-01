@@ -201,8 +201,8 @@
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) return JSON.parse(raw);
     } catch (e) {}
-    // 3. Primera vez: datos de ejemplo
-    const fresh = seed();
+    // 3. Primera vez: store vacío (sin datos demo)
+    const fresh = emptyStore();
     save(fresh);
     return fresh;
   }
@@ -227,6 +227,18 @@
     save(DB);
   }
   function nextId() { return DB._nextId++; }
+
+  function emptyStore() {
+    return {
+      _nextId: 1,
+      categorias: [...CATEGORIAS],
+      cuentas: [],
+      deudas: [],
+      metas: [],
+      transacciones: [],
+      presupuestos: [],
+    };
+  }
 
   // ---- subscribers ----
   const subs = new Set();
@@ -413,6 +425,44 @@
   function updateMeta(id, d) { const i = DB.metas.findIndex((x) => x.id === id); if (i >= 0) { DB.metas[i] = { ...DB.metas[i], ...d, monto_objetivo: money(+d.monto_objetivo), monto_actual: money(+d.monto_actual) }; save(); } }
   function deleteMeta(id) { DB.metas = DB.metas.filter((x) => x.id !== id); save(); }
 
+  // -------------------- CATEGORÍAS --------------------
+  function getCategorias() {
+    if (!DB.categorias || !DB.categorias.length) DB.categorias = [...CATEGORIAS];
+    return DB.categorias.slice();
+  }
+  function addCategoria(nombre) {
+    if (!DB.categorias) DB.categorias = [...CATEGORIAS];
+    const n = nombre.trim();
+    if (!n || DB.categorias.includes(n)) return false;
+    DB.categorias.push(n);
+    save();
+    return true;
+  }
+  function renameCategoria(antigua, nueva) {
+    if (!DB.categorias) DB.categorias = [...CATEGORIAS];
+    const i = DB.categorias.indexOf(antigua);
+    if (i < 0) return false;
+    const n = nueva.trim();
+    if (!n || (DB.categorias.includes(n) && n !== antigua)) return false;
+    DB.categorias[i] = n;
+    DB.transacciones.forEach((t) => { if (t.categoria === antigua) t.categoria = n; });
+    DB.presupuestos.forEach((p) => { if (p.categoria === antigua) p.categoria = n; });
+    save();
+    return true;
+  }
+  function deleteCategoria(nombre) {
+    if (!DB.categorias) DB.categorias = [...CATEGORIAS];
+    const i = DB.categorias.indexOf(nombre);
+    if (i < 0) return false;
+    DB.categorias.splice(i, 1);
+    save();
+    return true;
+  }
+  function reorderCategorias(ordered) {
+    DB.categorias = ordered;
+    save();
+  }
+
   function addCuenta(d) { const x = { id: nextId(), activa: true, notas: "", ...d, saldo: money(+d.saldo || 0) }; DB.cuentas.push(x); save(); return x; }
   function updateCuenta(id, d) { const i = DB.cuentas.findIndex((x) => x.id === id); if (i >= 0) { DB.cuentas[i] = { ...DB.cuentas[i], ...d, saldo: money(+d.saldo) }; save(); } }
   function deleteCuenta(id) { DB.cuentas = DB.cuentas.filter((x) => x.id !== id); save(); }
@@ -421,6 +471,7 @@
   window.FinanzasStore = {
     CATEGORIAS, TIPOS, MES_ACTUAL, ANIO_ACTUAL, HOY, nombreMes,
     subscribe, reset,
+    getCategorias, addCategoria, renameCategoria, deleteCategoria, reorderCategorias,
     getCuentas, getDeudas, getMetas, getTransacciones, getPresupuestos, getDashboard,
     addTransaccion, updateTransaccion, deleteTransaccion,
     addPresupuesto, updatePresupuesto, deletePresupuesto,
