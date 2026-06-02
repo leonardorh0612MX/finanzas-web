@@ -7,9 +7,9 @@
   "use strict";
 
   const STORAGE_KEY = "finanzas_store_v2";
-  const HOY = new Date(2026, 4, 31); // 31 may 2026 (mes 0-indexed: 4 = mayo)
-  const MES_ACTUAL = HOY.getMonth() + 1; // 5
-  const ANIO_ACTUAL = HOY.getFullYear(); // 2026
+  const HOY = new Date();
+  const MES_ACTUAL = HOY.getMonth() + 1;
+  const ANIO_ACTUAL = HOY.getFullYear();
 
   const CATEGORIAS = [
     "Alimentación", "Transporte", "Entretenimiento", "Salud", "Ropa",
@@ -271,6 +271,22 @@
     return "Iniciando";
   }
 
+  function getSaldoActual(cuentaId) {
+    const cuenta = DB.cuentas.find((c) => c.id === cuentaId);
+    if (!cuenta) return 0;
+    let balance = cuenta.saldo_inicial !== undefined ? cuenta.saldo_inicial : (cuenta.saldo || 0);
+    DB.transacciones.forEach((t) => {
+      if (t.tipo === "Ingreso" && t.cuenta === cuentaId) balance += t.monto;
+      else if ((t.tipo === "Gasto" || t.tipo === "Pago de deuda") && t.cuenta === cuentaId) balance -= t.monto;
+      else if (t.tipo === "Ahorro" && t.cuenta === cuentaId) balance += t.monto;
+      else if (t.tipo === "Transferencia") {
+        if (t.cuenta === cuentaId) balance -= t.monto;
+        if (t.cuenta_destino === cuentaId) balance += t.monto;
+      }
+    });
+    return money(balance);
+  }
+
   // gasto_actual de un presupuesto = suma de transacciones tipo Gasto de su categoría ese mes/año
   function gastoPresupuesto(p) {
     return money(DB.transacciones
@@ -297,7 +313,13 @@
   // -------------------- API SELECTORS --------------------
   const nombreMes = ["", "Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 
-  function getCuentas() { return DB.cuentas.slice(); }
+  function getCuentas() {
+    return DB.cuentas.map((c) => ({
+      ...c,
+      saldo_inicial: c.saldo_inicial !== undefined ? c.saldo_inicial : (c.saldo || 0),
+      saldo_actual: getSaldoActual(c.id),
+    }));
+  }
   function getDeudas() { return DB.deudas.map(deudaConDerivados); }
   function getMetas() { return DB.metas.map(metaConDerivados); }
 
@@ -321,8 +343,8 @@
   }
 
   function getDashboard() {
-    const cuentasActivas = DB.cuentas.filter((c) => c.activa);
-    const saldo_total = money(cuentasActivas.reduce((s, c) => s + c.saldo, 0));
+    const cuentasActivas = getCuentas().filter((c) => c.activa);
+    const saldo_total = money(cuentasActivas.reduce((s, c) => s + c.saldo_actual, 0));
 
     const txMes = DB.transacciones.filter((t) => t.mes === MES_ACTUAL && t.anio === ANIO_ACTUAL);
     const ingresos_mes = money(txMes.filter((t) => t.tipo === "Ingreso").reduce((s, t) => s + t.monto, 0));
@@ -387,7 +409,7 @@
   // -------------------- MUTACIONES --------------------
   function addTransaccion(data) {
     const [y, m] = data.fecha.split("-").map(Number);
-    const t = { id: nextId(), notas: "", cuenta: null, deuda: null, ...data, monto: money(+data.monto), mes: m, anio: y };
+    const t = { id: nextId(), notas: "", cuenta: null, cuenta_destino: null, deuda: null, ...data, monto: money(+data.monto), mes: m, anio: y };
     DB.transacciones.push(t);
     if (t.tipo === "Pago de deuda" && t.deuda) {
       const d = DB.deudas.find((x) => x.id === +t.deuda);
@@ -400,7 +422,8 @@
     const i = DB.transacciones.findIndex((t) => t.id === id);
     if (i < 0) return;
     const [y, m] = data.fecha.split("-").map(Number);
-    DB.transacciones[i] = { ...DB.transacciones[i], ...data, monto: money(+data.monto), mes: m, anio: y };
+    DB.transacciones[i] = { ...DB.transacciones[i], ...data, monto: money(+data.monto), mes: m, anio: y,
+      cuenta_destino: data.tipo === "Transferencia" && data.cuenta_destino ? +data.cuenta_destino : null };
     save();
   }
   function deleteTransaccion(id) {
@@ -463,8 +486,8 @@
     save();
   }
 
-  function addCuenta(d) { const x = { id: nextId(), activa: true, notas: "", ...d, saldo: money(+d.saldo || 0) }; DB.cuentas.push(x); save(); return x; }
-  function updateCuenta(id, d) { const i = DB.cuentas.findIndex((x) => x.id === id); if (i >= 0) { DB.cuentas[i] = { ...DB.cuentas[i], ...d, saldo: money(+d.saldo) }; save(); } }
+  function addCuenta(d) { const { saldo, ...rest } = d; const x = { id: nextId(), activa: true, notas: "", ...rest, saldo_inicial: money(+saldo || 0) }; DB.cuentas.push(x); save(); return x; }
+  function updateCuenta(id, d) { const i = DB.cuentas.findIndex((x) => x.id === id); if (i >= 0) { const { saldo, saldo_inicial, saldo_actual, ...rest } = d; DB.cuentas[i] = { ...DB.cuentas[i], ...rest }; save(); } }
   function deleteCuenta(id) { DB.cuentas = DB.cuentas.filter((x) => x.id !== id); save(); }
   function toggleCuenta(id) { const c = DB.cuentas.find((x) => x.id === id); if (c) { c.activa = !c.activa; save(); } }
 

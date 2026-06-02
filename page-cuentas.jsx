@@ -5,14 +5,17 @@ const CUENTA_COLOR = { "Débito": "#3b82f6", "Crédito": "#a855f7", "Efectivo": 
 function CuentaForm({ initial, onClose }) {
   const S = window.FinanzasStore;
   const toast = useToast();
-  const [f, setF] = React.useState(initial || { nombre: "", tipo: "Débito", banco: "", saldo: "", notas: "" });
+  const isEditing = !!(initial && initial.id);
+  const [f, setF] = React.useState(isEditing
+    ? { nombre: initial.nombre, tipo: initial.tipo, banco: initial.banco || "", notas: initial.notas || "" }
+    : { nombre: "", tipo: "Débito", banco: "", saldo: "", notas: "" });
   const [err, setErr] = React.useState({});
   const set = (k) => (v) => setF((s) => ({ ...s, [k]: v }));
   const submit = () => {
     const e = {};
     if (!f.nombre.trim()) e.nombre = "Requerido";
     setErr(e); if (Object.keys(e).length) return;
-    if (initial && initial.id) { S.updateCuenta(initial.id, f); toast("Cuenta actualizada"); }
+    if (isEditing) { S.updateCuenta(initial.id, f); toast("Cuenta actualizada"); }
     else { S.addCuenta(f); toast("Cuenta creada"); }
     onClose();
   };
@@ -23,11 +26,26 @@ function CuentaForm({ initial, onClose }) {
         <Field label="Tipo"><Select value={f.tipo} onChange={set("tipo")} options={["Débito", "Crédito", "Efectivo", "Inversión"]} /></Field>
         <Field label="Banco / Institución"><TextInput value={f.banco} onChange={set("banco")} placeholder="Ej. BBVA" /></Field>
       </div>
-      <Field label="Saldo inicial (MXN)" hint="Puede ser negativo para tarjetas de crédito"><TextInput type="number" mono value={f.saldo} onChange={set("saldo")} placeholder="0.00" /></Field>
+      {isEditing ? (
+        <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid var(--border)", borderRadius: 8, padding: "12px 14px", fontSize: 13 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, color: "#888" }}>
+            <span>Saldo inicial (fijo)</span>
+            <span style={{ fontFamily: "var(--mono)", color: "#ccc" }}>{fmtMoney(initial.saldo_inicial)}</span>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", color: "#888" }}>
+            <span>Saldo actual (calculado)</span>
+            <span style={{ fontFamily: "var(--mono)", color: initial.saldo_actual < 0 ? "#ef4444" : "#10b981", fontWeight: 600 }}>{fmtMoney(initial.saldo_actual)}</span>
+          </div>
+        </div>
+      ) : (
+        <Field label="Saldo inicial (MXN)" hint="Punto de partida — el saldo actual se calcula sumando tus transacciones">
+          <TextInput type="number" mono value={f.saldo} onChange={set("saldo")} placeholder="0.00" />
+        </Field>
+      )}
       <Field label="Notas"><Textarea value={f.notas} onChange={set("notas")} placeholder="Opcional" /></Field>
       <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 8 }}>
         <Button variant="ghost" onClick={onClose}>Cancelar</Button>
-        <Button variant="primary" icon="check" onClick={submit}>{initial && initial.id ? "Guardar" : "Crear cuenta"}</Button>
+        <Button variant="primary" icon="check" onClick={submit}>{isEditing ? "Guardar" : "Crear cuenta"}</Button>
       </div>
     </>
   );
@@ -59,7 +77,7 @@ function CuentaCard({ c, onEdit, onDelete, onToggle }) {
 
       <div>
         <div style={{ fontSize: 10.5, color: "#777", marginBottom: 3 }}>Saldo actual</div>
-        <div style={{ fontSize: 22, fontWeight: 600, fontFamily: "var(--mono)", color: c.saldo < 0 ? "#ef4444" : "#eaeaea" }}>{fmtMoney(c.saldo)}</div>
+        <div style={{ fontSize: 22, fontWeight: 600, fontFamily: "var(--mono)", color: c.saldo_actual < 0 ? "#ef4444" : "#eaeaea" }}>{fmtMoney(c.saldo_actual)}</div>
       </div>
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid var(--border)", paddingTop: 12 }}>
@@ -83,11 +101,11 @@ function Cuentas() {
   const [del, setDel] = React.useState(null);
   const list = S.getCuentas();
   const activas = list.filter((c) => c.activa);
-  const totalActivo = activas.reduce((s, c) => s + c.saldo, 0);
+  const totalActivo = activas.reduce((s, c) => s + c.saldo_actual, 0);
 
   // agrupar por tipo para resumen
   const porTipo = {};
-  activas.forEach((c) => { porTipo[c.tipo] = (porTipo[c.tipo] || 0) + c.saldo; });
+  activas.forEach((c) => { porTipo[c.tipo] = (porTipo[c.tipo] || 0) + c.saldo_actual; });
 
   return (
     <div>

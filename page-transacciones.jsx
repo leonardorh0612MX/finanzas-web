@@ -5,7 +5,7 @@ const TIPO_COLOR = { "Ingreso": "#10b981", "Gasto": "#ef4444", "Pago de deuda": 
 function TransaccionForm({ initial, onClose }) {
   const S = window.FinanzasStore;
   const toast = useToast();
-  const [f, setF] = React.useState(initial || { nombre: "", fecha: todayISO(), tipo: "Gasto", monto: "", categoria: "Alimentación", cuenta: "", deuda: "", notas: "" });
+  const [f, setF] = React.useState(initial || { nombre: "", fecha: todayISO(), tipo: "Gasto", monto: "", categoria: "Alimentación", cuenta: "", cuenta_destino: "", deuda: "", notas: "" });
   const [err, setErr] = React.useState({});
   const set = (k) => (v) => setF((s) => ({ ...s, [k]: v }));
   const cuentas = S.getCuentas();
@@ -18,7 +18,7 @@ function TransaccionForm({ initial, onClose }) {
     if (!(+f.monto > 0)) e.monto = "El monto debe ser mayor a 0";
     setErr(e);
     if (Object.keys(e).length) return;
-    const payload = { ...f, monto: +f.monto, cuenta: f.cuenta ? +f.cuenta : null, deuda: f.tipo === "Pago de deuda" && f.deuda ? +f.deuda : null };
+    const payload = { ...f, monto: +f.monto, cuenta: f.cuenta ? +f.cuenta : null, cuenta_destino: f.tipo === "Transferencia" && f.cuenta_destino ? +f.cuenta_destino : null, deuda: f.tipo === "Pago de deuda" && f.deuda ? +f.deuda : null };
     if (initial && initial.id) { S.updateTransaccion(initial.id, payload); toast("Transacción actualizada"); }
     else { S.addTransaccion(payload); toast("Transacción guardada"); }
     onClose();
@@ -36,7 +36,14 @@ function TransaccionForm({ initial, onClose }) {
           <Field label="Monto (MXN)" error={err.monto}><TextInput type="number" mono value={f.monto} onChange={set("monto")} placeholder="0.00" /></Field>
           <Field label="Categoría"><Select value={f.categoria} onChange={set("categoria")} options={S.getCategorias()} /></Field>
         </div>
-        <Field label="Cuenta"><Select value={f.cuenta} onChange={set("cuenta")} placeholder="— Selecciona —" options={cuentas.map((c) => ({ value: c.id, label: `${c.nombre} · ${c.tipo}` }))} /></Field>
+        {f.tipo === "Transferencia" ? (
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <Field label="Cuenta origen"><Select value={f.cuenta} onChange={set("cuenta")} placeholder="— Selecciona —" options={cuentas.map((c) => ({ value: c.id, label: `${c.nombre} · ${c.tipo}` }))} /></Field>
+            <Field label="Cuenta destino"><Select value={f.cuenta_destino} onChange={set("cuenta_destino")} placeholder="— Selecciona —" options={cuentas.map((c) => ({ value: c.id, label: `${c.nombre} · ${c.tipo}` }))} /></Field>
+          </div>
+        ) : (
+          <Field label="Cuenta"><Select value={f.cuenta} onChange={set("cuenta")} placeholder="— Selecciona —" options={cuentas.map((c) => ({ value: c.id, label: `${c.nombre} · ${c.tipo}` }))} /></Field>
+        )}
         {f.tipo === "Pago de deuda" && (
           <Field label="Deuda vinculada" hint="El pago se sumará al avance de la deuda">
             <Select value={f.deuda} onChange={set("deuda")} placeholder="— Selecciona deuda —" options={deudas.map((d) => ({ value: d.id, label: `${d.nombre} · resta ${fmtMoneyShort(d.saldo_restante)}` }))} />
@@ -134,7 +141,11 @@ function Transacciones() {
                     <td style={{ padding: "11px 12px", textAlign: "right", fontFamily: "var(--mono)", fontSize: 13, fontWeight: 600, whiteSpace: "nowrap", color: TIPO_COLOR[t.tipo] }}>
                       {t.tipo === "Ingreso" ? "+" : t.tipo === "Gasto" || t.tipo === "Pago de deuda" ? "−" : ""}{fmtMoney(t.monto)}
                     </td>
-                    <td style={{ padding: "11px 12px", fontSize: 12.5, color: "#999", whiteSpace: "nowrap" }}>{t.cuenta ? cuentasMap[t.cuenta] || "—" : "—"}</td>
+                    <td style={{ padding: "11px 12px", fontSize: 12.5, color: "#999", whiteSpace: "nowrap" }}>
+                      {t.tipo === "Transferencia" && t.cuenta_destino
+                        ? `${cuentasMap[t.cuenta] || "—"} → ${cuentasMap[t.cuenta_destino] || "—"}`
+                        : (t.cuenta ? cuentasMap[t.cuenta] || "—" : "—")}
+                    </td>
                     <td style={{ padding: "11px 8px", whiteSpace: "nowrap" }}>
                       <div style={{ display: "flex", gap: 2 }}>
                         <button className="ibtn" onClick={() => { setEditing(t); setDrawer(true); }} title="Editar"><Icon name="edit" size={15} /></button>

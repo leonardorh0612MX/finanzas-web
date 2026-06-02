@@ -34,7 +34,6 @@ function App() {
   const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
   const [tab, setTab] = React.useState(() => (location.hash || "#dashboard").slice(1));
   const [menu, setMenu] = React.useState(false);
-  const toast = useToast();
 
   React.useEffect(() => {
     const h = () => setTab((location.hash || "#dashboard").slice(1));
@@ -81,7 +80,6 @@ function App() {
             ))}
           </nav>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <button className="ibtn" title="Restablecer datos de ejemplo" onClick={() => { window.FinanzasStore.reset(); toast("Datos restablecidos", "info"); }}><Icon name="refresh" size={16} /></button>
             <button className="tabs-mobile ibtn" onClick={() => setMenu((m) => !m)}><Icon name="menu" size={18} /></button>
           </div>
         </div>
