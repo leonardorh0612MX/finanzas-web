@@ -3,9 +3,10 @@
 function PresupuestoForm({ initial, mes, anio, onClose }) {
   const S = window.FinanzasStore;
   const toast = useToast();
-  const [f, setF] = React.useState(initial || { nombre: "", categoria: "Alimentación", mes, anio, presupuesto: "", notas: "" });
+  const [f, setF] = React.useState(initial || { nombre: "", categoria: "Alimentación", subcategoria: "", mes, anio, presupuesto: "", notas: "" });
   const [err, setErr] = React.useState({});
   const set = (k) => (v) => setF((s) => ({ ...s, [k]: v }));
+  const subs = S.getSubcategorias(f.categoria);
   const submit = () => {
     const e = {};
     if (!f.nombre.trim()) e.nombre = "Requerido";
@@ -18,7 +19,12 @@ function PresupuestoForm({ initial, mes, anio, onClose }) {
   return (
     <>
       <Field label="Nombre" error={err.nombre}><TextInput value={f.nombre} onChange={set("nombre")} placeholder="Ej. Comida del mes" /></Field>
-      <Field label="Categoría" hint="El gasto se calcula con las transacciones de esta categoría"><Select value={f.categoria} onChange={set("categoria")} options={S.getCategorias()} /></Field>
+      <div style={{ display: "grid", gridTemplateColumns: subs.length ? "1fr 1fr" : "1fr", gap: 12 }}>
+        <Field label="Categoría" hint={subs.length ? "" : "El gasto se calcula con las transacciones de esta categoría"}>
+          <Select value={f.categoria} onChange={(v) => { set("categoria")(v); set("subcategoria")(""); }} options={S.getCategorias()} />
+        </Field>
+        {subs.length > 0 && <Field label="Subcategoría" hint="Opcional — deja vacío para incluir toda la categoría"><Select value={f.subcategoria} onChange={set("subcategoria")} placeholder="— Toda la categoría —" options={subs} /></Field>}
+      </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         <Field label="Mes"><Select value={f.mes} onChange={(v) => set("mes")(+v)} options={Array.from({ length: 12 }, (_, i) => ({ value: i + 1, label: S.nombreMes[i + 1] }))} /></Field>
         <Field label="Año"><TextInput type="number" mono value={f.anio} onChange={(v) => set("anio")(+v)} /></Field>

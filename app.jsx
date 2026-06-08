@@ -15,6 +15,7 @@ const TABS = [
   { id: "deudas", label: "Deudas", icon: "debt" },
   { id: "metas", label: "Metas", icon: "goal" },
   { id: "cuentas", label: "Cuentas", icon: "wallet" },
+  { id: "suscripciones", label: "Suscripciones", icon: "subscription" },
   { id: "config", label: "Configuración", icon: "settings" },
 ];
 
@@ -56,6 +57,7 @@ function App() {
     deudas: <Deudas />,
     metas: <Metas />,
     cuentas: <Cuentas />,
+    suscripciones: <Suscripciones />,
     config: <Config />,
   };
 

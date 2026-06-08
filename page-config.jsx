@@ -45,52 +45,99 @@ function Ico({ d, size = 14, style = {} }) {
     </svg>
   );
 }
-const PENCIL = "M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z";
-const TRASH  = "M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6";
-const CHECK  = "M20 6L9 17l-5-5";
-const X_ICO  = "M18 6L6 18M6 6l12 12";
-const GRIP   = "M9 5h2M9 12h2M9 19h2M13 5h2M13 12h2M13 19h2";
-const PLUS   = "M12 5v14M5 12h14";
+const PENCIL  = "M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z";
+const TRASH   = "M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6";
+const CHECK   = "M20 6L9 17l-5-5";
+const PLUS    = "M12 5v14M5 12h14";
+const CHEVRON = "M6 9l6 6 6-6";
 
-// ─── Chip de categoría editable ───────────────────────────────────────────────
-function CatChip({ nombre, onRename, onDelete }) {
+// ─── Chip de subcategoría editable ────────────────────────────────────────────
+function SubChip({ categoria, nombre, onRename, onDelete }) {
   const [editing, setEditing] = React.useState(false);
   const [val, setVal] = React.useState(nombre);
-  const inputRef = React.useRef(null);
-
-  React.useEffect(() => {
-    if (editing) { setVal(nombre); inputRef.current?.focus(); inputRef.current?.select(); }
-  }, [editing]);
-
+  const ref = React.useRef(null);
+  React.useEffect(() => { if (editing) { setVal(nombre); ref.current?.focus(); ref.current?.select(); } }, [editing]);
   function confirm() {
-    if (val.trim() && val.trim() !== nombre) {
-      if (!onRename(nombre, val.trim())) { setVal(nombre); }
-    }
+    if (val.trim() && val.trim() !== nombre) { if (!onRename(nombre, val.trim())) setVal(nombre); }
     setEditing(false);
+  }
+  return (
+    <div style={{ ...pill, gap: 0, padding: "3px 3px 3px 10px", marginRight: 5, marginBottom: 5, fontSize: 12.5, background: "rgba(255,255,255,0.03)" }}>
+      {editing ? (
+        <input ref={ref} value={val} onChange={e => setVal(e.target.value)}
+          onKeyDown={e => { if (e.key === "Enter") confirm(); if (e.key === "Escape") { setVal(nombre); setEditing(false); } }}
+          onBlur={confirm} style={{ ...inputStyle, width: 120, padding: "2px 6px", fontSize: 12, height: 22 }} />
+      ) : <span style={{ userSelect: "none", color: "#bbb" }}>{nombre}</span>}
+      <button style={{ ...iBtn(false), width: 22, height: 22 }} onClick={() => setEditing(e => !e)}>
+        {editing ? <Ico d={CHECK} size={11} /> : <Ico d={PENCIL} size={10} />}
+      </button>
+      <button style={{ ...iBtn(true), width: 22, height: 22 }} onClick={() => onDelete(nombre)}>
+        <Ico d={TRASH} size={10} />
+      </button>
+    </div>
+  );
+}
+
+// ─── Fila de categoría con acordeón de subcategorías ─────────────────────────
+function CatRow({ cat, onRename, onDelete }) {
+  const toast = useToast();
+  const [open, setOpen] = React.useState(false);
+  const [editing, setEditing] = React.useState(false);
+  const [val, setVal] = React.useState(cat.nombre);
+  const [nuevaSub, setNuevaSub] = React.useState("");
+  const subRef = React.useRef(null);
+
+  function confirmRename() {
+    if (val.trim() && val.trim() !== cat.nombre) { if (!onRename(cat.nombre, val.trim())) setVal(cat.nombre); }
+    setEditing(false);
+  }
+  function addSub() {
+    const n = nuevaSub.trim();
+    if (!n) return;
+    if (S.addSubcategoria(cat.nombre, n)) { toast(`Subcategoría "${n}" agregada`, "ok"); setNuevaSub(""); subRef.current?.focus(); }
+    else toast("Ya existe esa subcategoría", "error");
   }
 
   return (
-    <div style={{ ...pill, gap: 0, padding: "4px 4px 4px 13px", marginBottom: 6, marginRight: 6 }}>
-      {editing ? (
-        <input ref={inputRef} value={val} onChange={(e) => setVal(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter") confirm(); if (e.key === "Escape") { setVal(nombre); setEditing(false); } }}
-          onBlur={confirm}
-          style={{ ...inputStyle, width: 140, padding: "3px 7px", fontSize: 13, height: 24 }} />
-      ) : (
-        <span style={{ userSelect: "none" }}>{nombre}</span>
+    <div style={{ borderBottom: "1px solid var(--border)", paddingBottom: open ? 14 : 0, marginBottom: open ? 8 : 0 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "10px 0" }}>
+        <button onClick={() => setOpen(o => !o)} style={{ background: "none", border: "none", cursor: "pointer", color: "#666", padding: 2, display: "flex" }}>
+          <Ico d={CHEVRON} size={14} style={{ transform: open ? "rotate(180deg)" : "", transition: "transform .2s" }} />
+        </button>
+        {editing ? (
+          <input value={val} onChange={e => setVal(e.target.value)}
+            onKeyDown={e => { if (e.key === "Enter") confirmRename(); if (e.key === "Escape") { setVal(cat.nombre); setEditing(false); } }}
+            onBlur={confirmRename} autoFocus
+            style={{ ...inputStyle, flex: 1, maxWidth: 200, padding: "4px 8px", fontSize: 13.5, height: 30 }} />
+        ) : (
+          <span style={{ flex: 1, fontSize: 13.5, fontWeight: 500 }}>{cat.nombre}</span>
+        )}
+        <span style={{ fontSize: 11, color: "#555", marginRight: 4 }}>{cat.subs.length} subs</span>
+        <button style={iBtn(false)} title="Renombrar" onClick={() => setEditing(e => !e)}>
+          {editing ? <Ico d={CHECK} size={13} /> : <Ico d={PENCIL} size={12} />}
+        </button>
+        <button style={iBtn(true)} title="Eliminar" onClick={() => onDelete(cat.nombre)}>
+          <Ico d={TRASH} size={12} />
+        </button>
+      </div>
+      {open && (
+        <div style={{ paddingLeft: 22, paddingBottom: 8 }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 0, marginBottom: 10 }}>
+            {cat.subs.map(sub => (
+              <SubChip key={sub} categoria={cat.nombre} nombre={sub}
+                onRename={(a, b) => { if (S.renameSubcategoria(cat.nombre, a, b)) { toast(`Renombrada a "${b}"`, "ok"); return true; } toast("No se pudo renombrar", "error"); return false; }}
+                onDelete={sub => { S.deleteSubcategoria(cat.nombre, sub); toast(`"${sub}" eliminada`, "ok"); }} />
+            ))}
+            {cat.subs.length === 0 && <span style={{ fontSize: 12, color: "#444" }}>Sin subcategorías aún.</span>}
+          </div>
+          <div style={{ display: "flex", gap: 8, maxWidth: 340 }}>
+            <input ref={subRef} value={nuevaSub} onChange={e => setNuevaSub(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter") addSub(); }}
+              placeholder="Nueva subcategoría…" style={{ ...inputStyle, flex: 1, fontSize: 12.5 }} />
+            <button style={{ ...addBtn, padding: "7px 12px", fontSize: 12 }} onClick={addSub}><Ico d={PLUS} size={12} /></button>
+          </div>
+        </div>
       )}
-      <button style={iBtn(false)} title="Renombrar"
-        onClick={() => setEditing((e) => !e)}
-        onMouseEnter={(e) => e.currentTarget.style.color = "#ccc"}
-        onMouseLeave={(e) => e.currentTarget.style.color = "#777"}>
-        {editing ? <Ico d={CHECK} size={13} /> : <Ico d={PENCIL} size={12} />}
-      </button>
-      <button style={iBtn(true)} title="Eliminar"
-        onClick={() => onDelete(nombre)}
-        onMouseEnter={(e) => e.currentTarget.style.color = "#f87171"}
-        onMouseLeave={(e) => e.currentTarget.style.color = "#ef4444"}>
-        <Ico d={TRASH} size={12} />
-      </button>
     </div>
   );
 }
@@ -98,78 +145,47 @@ function CatChip({ nombre, onRename, onDelete }) {
 // ─── Sección de Categorías ────────────────────────────────────────────────────
 function SeccionCategorias() {
   const toast = useToast();
-  const [cats, setCats] = React.useState(() => S.getCategorias());
+  const [cats, setCats] = React.useState(() => S.getCatObjs());
   const [nueva, setNueva] = React.useState("");
   const inputRef = React.useRef(null);
 
-  React.useEffect(() => S.subscribe(() => setCats(S.getCategorias())), []);
+  React.useEffect(() => S.subscribe(() => setCats(S.getCatObjs())), []);
 
   function handleAdd() {
     const n = nueva.trim();
     if (!n) return;
-    if (S.addCategoria(n)) {
-      toast(`"${n}" agregada`, "ok");
-      setNueva("");
-      inputRef.current?.focus();
-    } else {
-      toast("Esa categoría ya existe", "error");
-    }
+    if (S.addCategoria(n)) { toast(`"${n}" agregada`, "ok"); setNueva(""); inputRef.current?.focus(); }
+    else toast("Esa categoría ya existe", "error");
   }
-
   function handleRename(antigua, nueva) {
-    if (S.renameCategoria(antigua, nueva)) {
-      toast(`Renombrada a "${nueva}"`, "ok");
-      return true;
-    }
-    toast("No se pudo renombrar (¿ya existe?)", "error");
-    return false;
+    if (S.renameCategoria(antigua, nueva)) { toast(`Renombrada a "${nueva}"`, "ok"); return true; }
+    toast("No se pudo renombrar (¿ya existe?)", "error"); return false;
   }
-
   function handleDelete(nombre) {
-    const enUso = S.getTransacciones().some((t) => t.categoria === nombre)
-               || S.getPresupuestos().some((p) => p.categoria === nombre);
-    if (enUso) {
-      toast(`"${nombre}" está en uso — edítala en lugar de eliminarla`, "info");
-      return;
-    }
-    S.deleteCategoria(nombre);
-    toast(`"${nombre}" eliminada`, "ok");
+    const enUso = S.getTransacciones().some(t => t.categoria === nombre) || S.getPresupuestos().some(p => p.categoria === nombre);
+    if (enUso) { toast(`"${nombre}" está en uso — edítala en lugar de eliminarla`, "info"); return; }
+    S.deleteCategoria(nombre); toast(`"${nombre}" eliminada`, "ok");
   }
 
   return (
     <div style={panel}>
-      <div style={sectionTitle}>Categorías de transacciones</div>
-      <p style={{ fontSize: 12.5, color: "#666", margin: "0 0 18px" }}>
-        Estas categorías aparecen en el formulario de transacciones y presupuestos.
-        Haz clic en el lápiz para renombrar, en el basurero para eliminar.
-        No se puede eliminar una categoría que ya tiene transacciones o presupuestos vinculados.
+      <div style={sectionTitle}>Categorías y subcategorías</div>
+      <p style={{ fontSize: 12.5, color: "#666", margin: "0 0 14px" }}>
+        Expande una categoría con la flecha para gestionar sus subcategorías.
+        No se puede eliminar una categoría con transacciones o presupuestos vinculados.
       </p>
-
-      {/* chips existentes */}
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 0, marginBottom: 20 }}>
-        {cats.map((c) => (
-          <CatChip key={c} nombre={c}
-            onRename={handleRename}
-            onDelete={handleDelete} />
-        ))}
-        {cats.length === 0 && (
-          <span style={{ color: "#555", fontSize: 13 }}>Sin categorías — agrega una abajo.</span>
-        )}
+      <div style={{ marginBottom: 20 }}>
+        {cats.map(c => <CatRow key={c.nombre} cat={c} onRename={handleRename} onDelete={handleDelete} />)}
+        {cats.length === 0 && <span style={{ color: "#555", fontSize: 13 }}>Sin categorías — agrega una abajo.</span>}
       </div>
-
-      {/* agregar nueva */}
       <div style={{ display: "flex", gap: 10, alignItems: "center", maxWidth: 420 }}>
-        <input ref={inputRef} value={nueva}
-          onChange={(e) => setNueva(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter") handleAdd(); }}
-          placeholder="Nueva categoría…"
-          style={{ ...inputStyle, flex: 1 }} />
+        <input ref={inputRef} value={nueva} onChange={e => setNueva(e.target.value)}
+          onKeyDown={e => { if (e.key === "Enter") handleAdd(); }}
+          placeholder="Nueva categoría…" style={{ ...inputStyle, flex: 1 }} />
         <button style={addBtn} onClick={handleAdd}
-          onMouseEnter={(e) => e.currentTarget.style.background = "rgba(16,185,129,0.25)"}
-          onMouseLeave={(e) => e.currentTarget.style.background = "rgba(16,185,129,0.15)"}>
-          <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <Ico d={PLUS} size={13} /> Agregar
-          </span>
+          onMouseEnter={e => e.currentTarget.style.background = "rgba(16,185,129,0.25)"}
+          onMouseLeave={e => e.currentTarget.style.background = "rgba(16,185,129,0.15)"}>
+          <span style={{ display: "flex", alignItems: "center", gap: 6 }}><Ico d={PLUS} size={13} /> Agregar</span>
         </button>
       </div>
     </div>

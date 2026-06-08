@@ -11,9 +11,20 @@
   const MES_ACTUAL = HOY.getMonth() + 1;
   const ANIO_ACTUAL = HOY.getFullYear();
 
-  const CATEGORIAS = [
-    "Alimentación", "Transporte", "Entretenimiento", "Salud", "Ropa",
-    "Educación", "Servicios", "Vivienda", "Ahorro", "Sueldo", "Freelance", "Otros",
+  const CATEGORIAS_DEFAULT = [
+    { nombre: "Alimentación",    subs: ["Súper / Despensa", "Restaurantes", "Cafeterías", "Delivery"] },
+    { nombre: "Transporte",      subs: ["Gasolina", "Uber / Taxi", "Transporte público", "Estacionamiento"] },
+    { nombre: "Entretenimiento", subs: ["Streaming", "Cine / Teatro", "Videojuegos", "Salidas"] },
+    { nombre: "Salud",           subs: ["Farmacia", "Consulta médica", "Gym", "Dentista"] },
+    { nombre: "Ropa",            subs: [] },
+    { nombre: "Educación",       subs: ["Cursos online", "Libros", "Suscripciones edu"] },
+    { nombre: "Servicios",       subs: ["Luz / CFE", "Internet", "Teléfono", "Agua", "Gas"] },
+    { nombre: "Vivienda",        subs: ["Renta", "Mantenimiento"] },
+    { nombre: "Suscripciones",   subs: ["Entretenimiento", "Software / Apps", "Salud", "Educación", "Otros"] },
+    { nombre: "Ahorro",          subs: [] },
+    { nombre: "Sueldo",          subs: [] },
+    { nombre: "Freelance",       subs: [] },
+    { nombre: "Otros",           subs: [] },
   ];
   const TIPOS = ["Gasto", "Ingreso", "Pago de deuda", "Ahorro", "Transferencia"];
 
@@ -231,12 +242,13 @@
   function emptyStore() {
     return {
       _nextId: 1,
-      categorias: [...CATEGORIAS],
+      categorias: CATEGORIAS_DEFAULT.map(c => ({ nombre: c.nombre, subs: [...c.subs] })),
       cuentas: [],
       deudas: [],
       metas: [],
       transacciones: [],
       presupuestos: [],
+      suscripciones: [],
     };
   }
 
@@ -247,6 +259,8 @@
 
   // inicializar después de declarar subs/notify (evita TDZ)
   DB = load();
+  if (!DB.suscripciones) DB.suscripciones = [];
+  procesarSuscripciones();
 
   // -------------------- DERIVADOS --------------------
   function estadoPresupuesto(pct) {
@@ -290,7 +304,9 @@
   // gasto_actual de un presupuesto = suma de transacciones tipo Gasto de su categoría ese mes/año
   function gastoPresupuesto(p) {
     return money(DB.transacciones
-      .filter((t) => t.tipo === "Gasto" && t.categoria === p.categoria && t.mes === p.mes && t.anio === p.anio)
+      .filter((t) => t.tipo === "Gasto" && t.categoria === p.categoria
+        && (!p.subcategoria || t.subcategoria === p.subcategoria)
+        && t.mes === p.mes && t.anio === p.anio)
       .reduce((s, t) => s + t.monto, 0));
   }
 
@@ -449,41 +465,131 @@
   function deleteMeta(id) { DB.metas = DB.metas.filter((x) => x.id !== id); save(); }
 
   // -------------------- CATEGORÍAS --------------------
-  function getCategorias() {
-    if (!DB.categorias || !DB.categorias.length) DB.categorias = [...CATEGORIAS];
-    return DB.categorias.slice();
+  function getCatObjs() {
+    if (!DB.categorias || !DB.categorias.length) {
+      DB.categorias = CATEGORIAS_DEFAULT.map(c => ({ nombre: c.nombre, subs: [...c.subs] }));
+    }
+    if (DB.categorias.length && typeof DB.categorias[0] === "string") {
+      DB.categorias = DB.categorias.map(nombre => {
+        const def = CATEGORIAS_DEFAULT.find(c => c.nombre === nombre);
+        return def ? { nombre: def.nombre, subs: [...def.subs] } : { nombre, subs: [] };
+      });
+      if (!DB.categorias.find(c => c.nombre === "Suscripciones")) {
+        DB.categorias.push({ nombre: "Suscripciones", subs: ["Entretenimiento", "Software / Apps", "Salud", "Educación", "Otros"] });
+      }
+      save();
+    }
+    return DB.categorias;
+  }
+  function getCategorias() { return getCatObjs().map(c => c.nombre); }
+  function getSubcategorias(categoria) {
+    const cat = getCatObjs().find(c => c.nombre === categoria);
+    return cat ? [...(cat.subs || [])] : [];
   }
   function addCategoria(nombre) {
-    if (!DB.categorias) DB.categorias = [...CATEGORIAS];
+    const cats = getCatObjs();
     const n = nombre.trim();
-    if (!n || DB.categorias.includes(n)) return false;
-    DB.categorias.push(n);
-    save();
-    return true;
+    if (!n || cats.find(c => c.nombre === n)) return false;
+    cats.push({ nombre: n, subs: [] }); save(); return true;
   }
   function renameCategoria(antigua, nueva) {
-    if (!DB.categorias) DB.categorias = [...CATEGORIAS];
-    const i = DB.categorias.indexOf(antigua);
-    if (i < 0) return false;
+    const cat = getCatObjs().find(c => c.nombre === antigua);
+    if (!cat) return false;
     const n = nueva.trim();
-    if (!n || (DB.categorias.includes(n) && n !== antigua)) return false;
-    DB.categorias[i] = n;
-    DB.transacciones.forEach((t) => { if (t.categoria === antigua) t.categoria = n; });
-    DB.presupuestos.forEach((p) => { if (p.categoria === antigua) p.categoria = n; });
-    save();
-    return true;
+    if (!n || (getCatObjs().find(c => c.nombre === n) && n !== antigua)) return false;
+    cat.nombre = n;
+    DB.transacciones.forEach(t => { if (t.categoria === antigua) t.categoria = n; });
+    DB.presupuestos.forEach(p => { if (p.categoria === antigua) p.categoria = n; });
+    (DB.suscripciones || []).forEach(s => { if (s.categoria === antigua) s.categoria = n; });
+    save(); return true;
   }
   function deleteCategoria(nombre) {
-    if (!DB.categorias) DB.categorias = [...CATEGORIAS];
-    const i = DB.categorias.indexOf(nombre);
+    const i = getCatObjs().findIndex(c => c.nombre === nombre);
     if (i < 0) return false;
-    DB.categorias.splice(i, 1);
-    save();
-    return true;
+    DB.categorias.splice(i, 1); save(); return true;
   }
-  function reorderCategorias(ordered) {
-    DB.categorias = ordered;
+  function reorderCategorias(ordered) { DB.categorias = ordered; save(); }
+  function addSubcategoria(categoria, sub) {
+    const cat = getCatObjs().find(c => c.nombre === categoria);
+    if (!cat) return false;
+    const n = sub.trim();
+    if (!n || cat.subs.includes(n)) return false;
+    cat.subs.push(n); save(); return true;
+  }
+  function renameSubcategoria(categoria, antigua, nueva) {
+    const cat = getCatObjs().find(c => c.nombre === categoria);
+    if (!cat) return false;
+    const i = cat.subs.indexOf(antigua);
+    if (i < 0) return false;
+    const n = nueva.trim();
+    if (!n || (cat.subs.includes(n) && n !== antigua)) return false;
+    cat.subs[i] = n;
+    DB.transacciones.forEach(t => { if (t.categoria === categoria && t.subcategoria === antigua) t.subcategoria = n; });
+    DB.presupuestos.forEach(p => { if (p.categoria === categoria && p.subcategoria === antigua) p.subcategoria = n; });
+    save(); return true;
+  }
+  function deleteSubcategoria(categoria, sub) {
+    const cat = getCatObjs().find(c => c.nombre === categoria);
+    if (!cat) return false;
+    const i = cat.subs.indexOf(sub);
+    if (i < 0) return false;
+    cat.subs.splice(i, 1); save(); return true;
+  }
+
+  // -------------------- SUSCRIPCIONES --------------------
+  function calcFechasCobro(sus, hasta) {
+    const fechas = [];
+    let d = new Date(sus.fecha_inicio + "T12:00:00");
+    const fin = new Date(hasta); fin.setHours(23, 59, 59, 999);
+    if (isNaN(d)) return fechas;
+    while (d <= fin) {
+      fechas.push(ymd(d.getFullYear(), d.getMonth() + 1, d.getDate()));
+      if (sus.frecuencia === "mensual")  d.setMonth(d.getMonth() + 1);
+      else if (sus.frecuencia === "anual")    d.setFullYear(d.getFullYear() + 1);
+      else if (sus.frecuencia === "semanal")  d.setDate(d.getDate() + 7);
+      else if (sus.frecuencia === "quincenal") d.setDate(d.getDate() + 15);
+      else break;
+    }
+    return fechas;
+  }
+  function procesarSuscripciones() {
+    if (!DB.suscripciones || !DB.suscripciones.length) return;
+    let modified = false;
+    DB.suscripciones.filter(s => s.activa !== false).forEach(sus => {
+      calcFechasCobro(sus, HOY).forEach(fecha => {
+        if (!DB.transacciones.some(t => t.suscripcion_id === sus.id && t.fecha === fecha)) {
+          const [y, m] = fecha.split("-").map(Number);
+          DB.transacciones.push({
+            id: nextId(), nombre: sus.nombre, fecha, mes: m, anio: y,
+            tipo: "Gasto", monto: money(sus.monto),
+            categoria: sus.categoria, subcategoria: sus.subcategoria || "",
+            cuenta: sus.cuenta || null, cuenta_destino: null, deuda: null,
+            notas: "Auto · suscripción", suscripcion_id: sus.id,
+          });
+          modified = true;
+        }
+      });
+    });
+    if (modified) save();
+  }
+  function getSuscripciones() { return (DB.suscripciones || []).slice(); }
+  function addSuscripcion(d) {
+    if (!DB.suscripciones) DB.suscripciones = [];
+    const s = { id: nextId(), activa: true, notas: "", subcategoria: "", cuenta: null, ...d, monto: money(+d.monto) };
+    DB.suscripciones.push(s); procesarSuscripciones(); return s;
+  }
+  function updateSuscripcion(id, d) {
+    const i = (DB.suscripciones || []).findIndex(s => s.id === id);
+    if (i >= 0) { DB.suscripciones[i] = { ...DB.suscripciones[i], ...d, monto: money(+d.monto) }; procesarSuscripciones(); }
+  }
+  function deleteSuscripcion(id) {
+    DB.suscripciones = (DB.suscripciones || []).filter(s => s.id !== id);
+    DB.transacciones = DB.transacciones.filter(t => t.suscripcion_id !== id);
     save();
+  }
+  function toggleSuscripcion(id) {
+    const s = (DB.suscripciones || []).find(s => s.id === id);
+    if (s) { s.activa = !s.activa; procesarSuscripciones(); }
   }
 
   function addCuenta(d) { const { saldo, ...rest } = d; const x = { id: nextId(), activa: true, notas: "", ...rest, saldo_inicial: money(+saldo || 0) }; DB.cuentas.push(x); save(); return x; }
@@ -492,10 +598,13 @@
   function toggleCuenta(id) { const c = DB.cuentas.find((x) => x.id === id); if (c) { c.activa = !c.activa; save(); } }
 
   window.FinanzasStore = {
-    CATEGORIAS, TIPOS, MES_ACTUAL, ANIO_ACTUAL, HOY, nombreMes,
+    TIPOS, MES_ACTUAL, ANIO_ACTUAL, HOY, nombreMes,
     subscribe, reset,
-    getCategorias, addCategoria, renameCategoria, deleteCategoria, reorderCategorias,
+    getCatObjs, getCategorias, getSubcategorias,
+    addCategoria, renameCategoria, deleteCategoria, reorderCategorias,
+    addSubcategoria, renameSubcategoria, deleteSubcategoria,
     getCuentas, getDeudas, getMetas, getTransacciones, getPresupuestos, getDashboard,
+    getSuscripciones, addSuscripcion, updateSuscripcion, deleteSuscripcion, toggleSuscripcion, calcFechasCobro,
     addTransaccion, updateTransaccion, deleteTransaccion,
     addPresupuesto, updatePresupuesto, deletePresupuesto,
     addDeuda, updateDeuda, deleteDeuda, registrarPagoDeuda,

@@ -5,7 +5,7 @@ const TIPO_COLOR = { "Ingreso": "#10b981", "Gasto": "#ef4444", "Pago de deuda": 
 function TransaccionForm({ initial, onClose }) {
   const S = window.FinanzasStore;
   const toast = useToast();
-  const [f, setF] = React.useState(initial || { nombre: "", fecha: todayISO(), tipo: "Gasto", monto: "", categoria: "Alimentación", cuenta: "", cuenta_destino: "", deuda: "", notas: "" });
+  const [f, setF] = React.useState(initial || { nombre: "", fecha: todayISO(), tipo: "Gasto", monto: "", categoria: "Alimentación", subcategoria: "", cuenta: "", cuenta_destino: "", deuda: "", notas: "" });
   const [err, setErr] = React.useState({});
   const set = (k) => (v) => setF((s) => ({ ...s, [k]: v }));
   const cuentas = S.getCuentas();
@@ -32,10 +32,13 @@ function TransaccionForm({ initial, onClose }) {
           <Field label="Fecha" error={err.fecha}><TextInput type="date" value={f.fecha} onChange={set("fecha")} /></Field>
           <Field label="Tipo"><Select value={f.tipo} onChange={set("tipo")} options={S.TIPOS} /></Field>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          <Field label="Monto (MXN)" error={err.monto}><TextInput type="number" mono value={f.monto} onChange={set("monto")} placeholder="0.00" /></Field>
-          <Field label="Categoría"><Select value={f.categoria} onChange={set("categoria")} options={S.getCategorias()} /></Field>
-        </div>
+        {(() => { const subs = S.getSubcategorias(f.categoria); return (
+          <div style={{ display: "grid", gridTemplateColumns: subs.length ? "1fr 1fr 1fr" : "1fr 1fr", gap: 12 }}>
+            <Field label="Monto (MXN)" error={err.monto}><TextInput type="number" mono value={f.monto} onChange={set("monto")} placeholder="0.00" /></Field>
+            <Field label="Categoría"><Select value={f.categoria} onChange={(v) => { set("categoria")(v); set("subcategoria")(""); }} options={S.getCategorias()} /></Field>
+            {subs.length > 0 && <Field label="Subcategoría"><Select value={f.subcategoria} onChange={set("subcategoria")} placeholder="— General —" options={subs} /></Field>}
+          </div>
+        ); })()}
         {f.tipo === "Transferencia" ? (
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <Field label="Cuenta origen"><Select value={f.cuenta} onChange={set("cuenta")} placeholder="— Selecciona —" options={cuentas.map((c) => ({ value: c.id, label: `${c.nombre} · ${c.tipo}` }))} /></Field>
