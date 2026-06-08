@@ -3,7 +3,7 @@
 function PresupuestoForm({ initial, mes, anio, onClose }) {
   const S = window.FinanzasStore;
   const toast = useToast();
-  const [f, setF] = React.useState(initial || { nombre: "", categoria: "Alimentación", subcategoria: "", mes, anio, presupuesto: "", notas: "" });
+  const [f, setF] = React.useState(initial || { nombre: "", tipo: "Variable", categoria: "Alimentación", subcategoria: "", mes, anio, presupuesto: "", notas: "" });
   const [err, setErr] = React.useState({});
   const set = (k) => (v) => setF((s) => ({ ...s, [k]: v }));
   const subs = S.getSubcategorias(f.categoria);
@@ -29,7 +29,12 @@ function PresupuestoForm({ initial, mes, anio, onClose }) {
         <Field label="Mes"><Select value={f.mes} onChange={(v) => set("mes")(+v)} options={Array.from({ length: 12 }, (_, i) => ({ value: i + 1, label: S.nombreMes[i + 1] }))} /></Field>
         <Field label="Año"><TextInput type="number" mono value={f.anio} onChange={(v) => set("anio")(+v)} /></Field>
       </div>
-      <Field label="Monto límite (MXN)" error={err.presupuesto}><TextInput type="number" mono value={f.presupuesto} onChange={set("presupuesto")} placeholder="0.00" /></Field>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <Field label="Monto límite (MXN)" error={err.presupuesto}><TextInput type="number" mono value={f.presupuesto} onChange={set("presupuesto")} placeholder="0.00" /></Field>
+        <Field label="Tipo de gasto" hint="Fijo = obligación; Variable = gasto discrecional">
+          <Select value={f.tipo} onChange={set("tipo")} options={[{ value: "Variable", label: "Variable" }, { value: "Fijo", label: "Fijo" }]} />
+        </Field>
+      </div>
       <Field label="Notas"><Textarea value={f.notas} onChange={set("notas")} placeholder="Opcional" /></Field>
       <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 8 }}>
         <Button variant="ghost" onClick={onClose}>Cancelar</Button>
@@ -50,7 +55,10 @@ function PresupuestoCard({ p, onEdit, onDelete }) {
             <span style={{ width: 7, height: 7, borderRadius: 2, background: CAT_COLORS[p.categoria] }}></span>{p.categoria}
           </div>
         </div>
-        <Badge color={color}>{p.estado}</Badge>
+        <div style={{ display: "flex", gap: 5, alignItems: "center" }}>
+          {p.tipo && <Badge color={p.tipo === "Fijo" ? "#ef4444" : "#8b5cf6"}>{p.tipo}</Badge>}
+          <Badge color={color}>{p.estado}</Badge>
+        </div>
       </div>
       <div>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 7 }}>

@@ -83,8 +83,36 @@ function Dashboard({ tw, onNav }) {
         </ChartCard>
         <ChartCard title="Estado de presupuestos" subtitle="Mes actual"
           right={<Button size="sm" variant="ghost" onClick={() => onNav("presupuestos")}>Ver todos</Button>}>
-          {d.presupuestos_mes.length ? <HBarChart data={d.presupuestos_mes} />
-            : <EmptyState icon="budget" title="Sin presupuestos" hint="Crea presupuestos para monitorear tus límites." />}
+          {d.presupuestos_mes.length ? (
+            <>
+              {(() => {
+                const fijos = d.presupuestos_mes.filter(p => p.tipo === "Fijo");
+                const vars  = d.presupuestos_mes.filter(p => p.tipo !== "Fijo");
+                const restaFijo = Math.max(0, fijos.reduce((s, p) => s + p.presupuesto, 0) - fijos.reduce((s, p) => s + p.gasto_actual, 0));
+                const dispVar   = vars.reduce((s, p) => s + p.presupuesto, 0) - vars.reduce((s, p) => s + p.gasto_actual, 0);
+                if (!fijos.length && !vars.length) return null;
+                return (
+                  <div style={{ display: "grid", gridTemplateColumns: fijos.length && vars.length ? "1fr 1fr" : "1fr", gap: 10, marginBottom: 14 }}>
+                    {fijos.length > 0 && (
+                      <div style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)", borderRadius: 10, padding: "12px 14px" }}>
+                        <div style={{ fontSize: 10.5, color: "#888", textTransform: "uppercase", letterSpacing: ".06em", fontWeight: 600, marginBottom: 5 }}>Fijos · Resta de pagar</div>
+                        <div style={{ fontSize: 20, fontWeight: 600, fontFamily: "var(--mono)", color: restaFijo > 0 ? "#f87171" : "#10b981" }}>{fmtMoney(restaFijo)}</div>
+                        <div style={{ fontSize: 11, color: "#555", marginTop: 3 }}>{fijos.length} fijo{fijos.length !== 1 ? "s" : ""}</div>
+                      </div>
+                    )}
+                    {vars.length > 0 && (
+                      <div style={{ background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.2)", borderRadius: 10, padding: "12px 14px" }}>
+                        <div style={{ fontSize: 10.5, color: "#888", textTransform: "uppercase", letterSpacing: ".06em", fontWeight: 600, marginBottom: 5 }}>Variables · Disponible</div>
+                        <div style={{ fontSize: 20, fontWeight: 600, fontFamily: "var(--mono)", color: dispVar >= 0 ? "#10b981" : "#ef4444" }}>{fmtMoney(dispVar)}</div>
+                        <div style={{ fontSize: 11, color: "#555", marginTop: 3 }}>{vars.length} variable{vars.length !== 1 ? "s" : ""}</div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+              <HBarChart data={d.presupuestos_mes} />
+            </>
+          ) : <EmptyState icon="budget" title="Sin presupuestos" hint="Crea presupuestos para monitorear tus límites." />}
         </ChartCard>
       </div>
 
