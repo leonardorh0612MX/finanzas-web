@@ -3,7 +3,8 @@
 function DeudaForm({ initial, onClose }) {
   const S = window.FinanzasStore;
   const toast = useToast();
-  const [f, setF] = React.useState(initial || { nombre: "", tipo: "Tarjeta de crédito", monto_total: "", tasa_interes: "", fecha_pago: todayISO(), notas: "" });
+  const cuentasCredito = window.FinanzasStore.getCuentas().filter(c => c.tipo === "Crédito" && c.activa);
+  const [f, setF] = React.useState(initial || { nombre: "", tipo: "Tarjeta de crédito", monto_total: "", tasa_interes: "", fecha_pago: todayISO(), cuenta_vinculada: null, notas: "" });
   const [err, setErr] = React.useState({});
   const set = (k) => (v) => setF((s) => ({ ...s, [k]: v }));
   const submit = () => {
@@ -24,6 +25,14 @@ function DeudaForm({ initial, onClose }) {
         <Field label="Tasa de interés (%)"><TextInput type="number" mono value={f.tasa_interes} onChange={set("tasa_interes")} placeholder="0.0" /></Field>
       </div>
       <Field label="Fecha límite de pago"><TextInput type="date" value={f.fecha_pago} onChange={set("fecha_pago")} /></Field>
+      {cuentasCredito.length > 0 && (
+        <Field label="Cuenta de crédito vinculada (opcional)"
+          hint="Si los gastos de esta deuda ya se registran en una tarjeta de crédito, vincúlala para evitar doble conteo en el Patrimonio Neto.">
+          <Select value={f.cuenta_vinculada || ""} onChange={v => set("cuenta_vinculada")(v ? +v : null)}
+            placeholder="— No vincular —"
+            options={cuentasCredito.map(c => ({ value: c.id, label: c.nombre }))} />
+        </Field>
+      )}
       <Field label="Notas"><Textarea value={f.notas} onChange={set("notas")} placeholder="Opcional" /></Field>
       <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 8 }}>
         <Button variant="ghost" onClick={onClose}>Cancelar</Button>
@@ -117,6 +126,9 @@ function Deudas() {
   const totalPagado = list.reduce((s, d) => s + d.pagado, 0);
   const totalResta = list.reduce((s, d) => s + d.saldo_restante, 0);
   const pctGlobal = totalOriginal > 0 ? (totalPagado / totalOriginal) * 100 : 0;
+  const dashboard = S.getDashboard();
+  const ratio = dashboard.kpis.ratio_endeudamiento;
+  const ratioColor = ratio > 40 ? "#ef4444" : ratio > 30 ? "#f59e0b" : "#10b981";
 
   return (
     <div>
@@ -129,11 +141,16 @@ function Deudas() {
       ) : (
         <>
           <Card style={{ marginBottom: 16 }}>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 18, marginBottom: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 18, marginBottom: 16 }}>
               <div><div style={{ fontSize: 11.5, color: "#888", marginBottom: 6 }}>Deuda total original</div><div style={{ fontSize: 20, fontWeight: 600, fontFamily: "var(--mono)" }}>{fmtMoney(totalOriginal)}</div></div>
               <div><div style={{ fontSize: 11.5, color: "#888", marginBottom: 6 }}>Total pagado</div><div style={{ fontSize: 20, fontWeight: 600, fontFamily: "var(--mono)", color: "#10b981" }}>{fmtMoney(totalPagado)}</div></div>
               <div><div style={{ fontSize: 11.5, color: "#888", marginBottom: 6 }}>Saldo restante</div><div style={{ fontSize: 20, fontWeight: 600, fontFamily: "var(--mono)", color: "#f59e0b" }}>{fmtMoney(totalResta)}</div></div>
               <div><div style={{ fontSize: 11.5, color: "#888", marginBottom: 6 }}>Avance global</div><div style={{ fontSize: 20, fontWeight: 600, fontFamily: "var(--mono)", color: "#3b82f6" }}>{pctGlobal.toFixed(1)}%</div></div>
+              <div>
+                <div style={{ fontSize: 11.5, color: "#888", marginBottom: 6 }}>Ratio endeudamiento</div>
+                <div style={{ fontSize: 20, fontWeight: 600, fontFamily: "var(--mono)", color: ratioColor }}>{ratio.toFixed(1)}%</div>
+                <div style={{ fontSize: 10.5, color: "#555", marginTop: 2 }}>{ratio > 30 ? "⚠ Sobre 30%" : "del ingreso mensual"}</div>
+              </div>
             </div>
             <ProgressBar pct={pctGlobal} color="#10b981" height={10} />
           </Card>

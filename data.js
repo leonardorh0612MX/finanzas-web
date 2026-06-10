@@ -323,18 +323,19 @@
   function metaConDerivados(m) {
     const porcentaje = m.monto_objetivo > 0 ? money((m.monto_actual / m.monto_objetivo) * 100) : 0;
     const faltante = money(Math.max(0, m.monto_objetivo - m.monto_actual));
-    // Proyección: promedio mensual de Ahorro vinculado a esta meta (últimos 3 meses)
+    // Proyección: promedio mensual de Ahorro vinculado (últimos 3 meses con aportaciones)
     let proyeccion_meses = null;
     if (faltante > 0) {
-      let totalAhorro = 0;
+      let totalAhorro = 0, mesesConDatos = 0;
       for (let back = 1; back <= 3; back++) {
         let y = ANIO_ACTUAL, mes = MES_ACTUAL - back;
         while (mes <= 0) { mes += 12; y -= 1; }
-        totalAhorro += DB.transacciones
+        const aporte = DB.transacciones
           .filter(t => t.tipo === "Ahorro" && t.meta === m.id && t.mes === mes && t.anio === y)
           .reduce((s, t) => s + t.monto, 0);
+        if (aporte > 0) { totalAhorro += aporte; mesesConDatos++; }
       }
-      const promedio = totalAhorro / 3;
+      const promedio = mesesConDatos > 0 ? totalAhorro / mesesConDatos : 0;
       if (promedio > 0) proyeccion_meses = Math.ceil(faltante / promedio);
     }
     return { ...m, porcentaje, faltante, estado: estadoMeta(porcentaje), proyeccion_meses };
@@ -376,10 +377,11 @@
     const cuentasActivas = getCuentas().filter((c) => c.activa);
     const saldo_total = money(cuentasActivas.reduce((s, c) => s + c.saldo_actual, 0));
 
-    // Patrimonio Neto = activos brutos - pasivos tarjetas - deudas externas
+    // Patrimonio Neto = activos brutos - pasivos tarjetas - deudas externas (sin doble-conteo)
     const activos = money(cuentasActivas.reduce((s, c) => s + Math.max(0, c.saldo_actual), 0));
     const pasivos_cuentas = money(cuentasActivas.filter(c => c.tipo === "Crédito").reduce((s, c) => s + Math.abs(Math.min(0, c.saldo_actual)), 0));
-    const pasivos_deudas = money(getDeudas().filter(d => d.estado !== "Liquidada").reduce((s, d) => s + d.saldo_restante, 0));
+    // Las deudas vinculadas a una cuenta de crédito ya están en pasivos_cuentas — no sumar doble
+    const pasivos_deudas = money(getDeudas().filter(d => d.estado !== "Liquidada" && !d.cuenta_vinculada).reduce((s, d) => s + d.saldo_restante, 0));
     const pasivos = money(pasivos_cuentas + pasivos_deudas);
     const patrimonio_neto = money(activos - pasivos);
 
@@ -436,6 +438,22 @@
 
     const presupuestos_mes = getPresupuestos(MES_ACTUAL, ANIO_ACTUAL);
 
+    // Ratio de endeudamiento = pagos de deuda / ingresos
+    const ratio_endeudamiento = ingresos_mes > 0 ? money((pagos_deuda_mes / ingresos_mes) * 100) : 0;
+
+    // Distribución 50/30/20
+    const NECS_CATS = ["Vivienda", "Servicios", "Alimentación", "Transporte", "Salud"];
+    const DESOS_CATS = ["Entretenimiento", "Ropa", "Suscripciones", "Educación", "Otros"];
+    const gastosT = txMes.filter(t => t.tipo === "Gasto");
+    const nec_monto = money(gastosT.filter(t => NECS_CATS.includes(t.categoria)).reduce((s, t) => s + t.monto, 0));
+    const des_monto = money(gastosT.filter(t => DESOS_CATS.includes(t.categoria)).reduce((s, t) => s + t.monto, 0));
+    const aho_monto = money(ahorro_mes + pagos_deuda_mes);
+    const distribucion = {
+      necesidades: { monto: nec_monto, pct: ingresos_mes > 0 ? money(nec_monto / ingresos_mes * 100) : 0, meta: 50 },
+      deseos:      { monto: des_monto, pct: ingresos_mes > 0 ? money(des_monto / ingresos_mes * 100) : 0, meta: 30 },
+      ahorro_deuda:{ monto: aho_monto, pct: ingresos_mes > 0 ? money(aho_monto / ingresos_mes * 100) : 0, meta: 20 },
+    };
+
     // alertas
     const presupuestos_excedidos = presupuestos_mes.filter((p) => p.estado === "Excedido" || p.estado === "Límite");
     const deudas_proximas = getDeudas().filter((d) => {
@@ -450,9 +468,9 @@
     });
 
     return {
-      kpis: { saldo_total, patrimonio_neto, activos, pasivos, ingresos_mes, gastos_mes, pagos_deuda_mes, ahorro_mes, tasa_ahorro, balance_mes, deuda_total,
+      kpis: { saldo_total, patrimonio_neto, activos, pasivos, ingresos_mes, gastos_mes, pagos_deuda_mes, ahorro_mes, tasa_ahorro, balance_mes, deuda_total, ratio_endeudamiento,
         comp: { ingresos_ant, gastos_ant, tasa_ahorro_ant, balance_ant } },
-      flujo_mensual, gastos_por_categoria, tendencia_balance, presupuestos_mes,
+      flujo_mensual, gastos_por_categoria, tendencia_balance, presupuestos_mes, distribucion,
       alertas: { presupuestos_excedidos, deudas_proximas, metas_criticas },
     };
   }
@@ -477,20 +495,29 @@
     const i = DB.transacciones.findIndex((t) => t.id === id);
     if (i < 0) return;
     const old = DB.transacciones[i];
-    // Revertir efecto anterior en meta
+    // Revertir efectos del registro anterior
     if (old.tipo === "Ahorro" && old.meta) {
       const mt = DB.metas.find((x) => x.id === old.meta);
       if (mt) mt.monto_actual = money(Math.max(0, mt.monto_actual - old.monto));
     }
+    if (old.tipo === "Pago de deuda" && old.deuda) {
+      const dv = DB.deudas.find((x) => x.id === old.deuda);
+      if (dv) dv.pagado = money(Math.max(0, dv.pagado - old.monto));
+    }
     const [y, mo] = data.fecha.split("-").map(Number);
     DB.transacciones[i] = { ...old, ...data, monto: money(+data.monto), mes: mo, anio: y,
       cuenta_destino: data.tipo === "Transferencia" && data.cuenta_destino ? +data.cuenta_destino : null,
-      meta: data.tipo === "Ahorro" && data.meta ? +data.meta : null };
-    // Aplicar nuevo efecto en meta
+      meta: data.tipo === "Ahorro" && data.meta ? +data.meta : null,
+      deuda: data.tipo === "Pago de deuda" && data.deuda ? +data.deuda : null };
+    // Aplicar efectos del nuevo registro
     const upd = DB.transacciones[i];
     if (upd.tipo === "Ahorro" && upd.meta) {
       const mt = DB.metas.find((x) => x.id === upd.meta);
       if (mt) mt.monto_actual = money(mt.monto_actual + upd.monto);
+    }
+    if (upd.tipo === "Pago de deuda" && upd.deuda) {
+      const dv = DB.deudas.find((x) => x.id === upd.deuda);
+      if (dv) dv.pagado = money(Math.min(dv.monto_total, dv.pagado + upd.monto));
     }
     save();
   }
@@ -500,10 +527,28 @@
       const mt = DB.metas.find((x) => x.id === t.meta);
       if (mt) mt.monto_actual = money(Math.max(0, mt.monto_actual - t.monto));
     }
+    if (t && t.tipo === "Pago de deuda" && t.deuda) {
+      const dv = DB.deudas.find((x) => x.id === t.deuda);
+      if (dv) dv.pagado = money(Math.max(0, dv.pagado - t.monto));
+    }
     DB.transacciones = DB.transacciones.filter((t) => t.id !== id);
     save();
   }
 
+  function copiarPresupuestos(mesOrig, anioOrig, mesDesc, anioDesc) {
+    const origen = DB.presupuestos.filter(p => p.mes === +mesOrig && p.anio === +anioOrig);
+    if (!origen.length) return 0;
+    const dest = DB.presupuestos.filter(p => p.mes === +mesDesc && p.anio === +anioDesc);
+    let copiados = 0;
+    origen.forEach(p => {
+      if (!dest.find(d => d.nombre === p.nombre && d.categoria === p.categoria && d.subcategoria === p.subcategoria)) {
+        DB.presupuestos.push({ ...p, id: nextId(), mes: +mesDesc, anio: +anioDesc });
+        copiados++;
+      }
+    });
+    if (copiados > 0) save();
+    return copiados;
+  }
   function addPresupuesto(d) { const p = { id: nextId(), notas: "", ...d, presupuesto: money(+d.presupuesto), mes: +d.mes, anio: +d.anio }; DB.presupuestos.push(p); save(); return p; }
   function updatePresupuesto(id, d) { const i = DB.presupuestos.findIndex((x) => x.id === id); if (i >= 0) { DB.presupuestos[i] = { ...DB.presupuestos[i], ...d, presupuesto: money(+d.presupuesto), mes: +d.mes, anio: +d.anio }; save(); } }
   function deletePresupuesto(id) { DB.presupuestos = DB.presupuestos.filter((x) => x.id !== id); save(); }
@@ -663,7 +708,7 @@
     getCuentas, getDeudas, getMetas, getTransacciones, getPresupuestos, getDashboard,
     getSuscripciones, addSuscripcion, updateSuscripcion, deleteSuscripcion, toggleSuscripcion, calcFechasCobro,
     addTransaccion, updateTransaccion, deleteTransaccion,
-    addPresupuesto, updatePresupuesto, deletePresupuesto,
+    addPresupuesto, updatePresupuesto, deletePresupuesto, copiarPresupuestos,
     addDeuda, updateDeuda, deleteDeuda, registrarPagoDeuda,
     addMeta, updateMeta, deleteMeta,
     addCuenta, updateCuenta, deleteCuenta, toggleCuenta,

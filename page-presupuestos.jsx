@@ -92,6 +92,14 @@ function Presupuestos() {
   const totalLim = list.reduce((s, p) => s + p.presupuesto, 0);
   const totalGas = list.reduce((s, p) => s + p.gasto_actual, 0);
 
+  const handleCopiar = () => {
+    let mAnt = mes - 1, aAnt = anio;
+    if (mAnt <= 0) { mAnt = 12; aAnt -= 1; }
+    const n = S.copiarPresupuestos(mAnt, aAnt, mes, anio);
+    if (n > 0) toast(`${n} presupuesto${n !== 1 ? "s" : ""} copiado${n !== 1 ? "s" : ""}`);
+    else toast(`No hay presupuestos en ${S.nombreMes[mAnt]} ${aAnt}`, "info");
+  };
+
   return (
     <div>
       <PageHeader title="Presupuestos" subtitle={`${S.nombreMes[mes]} ${anio} · ${list.length} presupuesto${list.length !== 1 ? "s" : ""}`}
@@ -100,6 +108,7 @@ function Presupuestos() {
             <div style={{ width: 120 }}><Select value={mes} onChange={(v) => setMes(+v)} options={Array.from({ length: 12 }, (_, i) => ({ value: i + 1, label: S.nombreMes[i + 1] }))} /></div>
             <div style={{ width: 100 }}><Select value={anio} onChange={(v) => setAnio(+v)} options={[S.ANIO_ACTUAL - 1, S.ANIO_ACTUAL, S.ANIO_ACTUAL + 1].map((a) => ({ value: a, label: a }))} /></div>
           </div>
+          <Button variant="ghost" icon="list" onClick={handleCopiar}>Copiar mes ant.</Button>
           <Button variant="primary" icon="plus" onClick={() => { setEditing(null); setDrawer(true); }}>Nuevo presupuesto</Button>
         </>} />
 

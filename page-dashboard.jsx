@@ -49,7 +49,8 @@ function Dashboard({ tw, onNav }) {
   const d = window.FinanzasStore.getDashboard();
   const k = d.kpis;
   const balPos = k.balance_mes >= 0;
-  const totalAlertas = d.alertas.presupuestos_excedidos.length + d.alertas.deudas_proximas.length + d.alertas.metas_criticas.length;
+  const endeudamientoAlto = k.ratio_endeudamiento > 30;
+  const totalAlertas = d.alertas.presupuestos_excedidos.length + d.alertas.deudas_proximas.length + d.alertas.metas_criticas.length + (endeudamientoAlto ? 1 : 0);
   const pct = (a, b) => (!b) ? null : +((a - b) / b * 100).toFixed(0);
 
   return (
@@ -86,6 +87,45 @@ function Dashboard({ tw, onNav }) {
           value={fmtMoney(k.deuda_total)} color="#f59e0b"
           sub="Saldo restante" icon="debt" accent="#f59e0b" delay={0.2} />
       </div>
+
+      {/* 50/30/20 */}
+      {(() => {
+        const di = d.distribucion;
+        const hasDatos = di.necesidades.monto > 0 || di.deseos.monto > 0 || di.ahorro_deuda.monto > 0;
+        if (!hasDatos) return null;
+        const BucketCard = ({ label, item, color }) => {
+          const sobre = item.pct > item.meta;
+          const barActual = Math.min(100, item.pct / item.meta * 100);
+          return (
+            <div style={{ background: "var(--panel-2)", border: `1px solid ${sobre ? color + "44" : "var(--border)"}`, borderRadius: 12, padding: "14px 16px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                <span style={{ fontSize: 12.5, fontWeight: 600 }}>{label}</span>
+                <span style={{ fontSize: 11, color: "#666" }}>Meta: {item.meta}%</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
+                <span style={{ fontFamily: "var(--mono)", fontSize: 18, fontWeight: 600, color: sobre ? color : "#eaeaea" }}>{item.pct.toFixed(1)}%</span>
+                <span style={{ fontSize: 12, color: "#666", fontFamily: "var(--mono)" }}>{fmtMoneyShort(item.monto)}</span>
+              </div>
+              <div style={{ height: 6, borderRadius: 4, background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
+                <div style={{ height: "100%", width: `${barActual}%`, borderRadius: 4, background: sobre ? color : "#10b981", transition: "width .6s" }} />
+              </div>
+              <div style={{ fontSize: 10.5, color: sobre ? color : "#555", marginTop: 5 }}>
+                {sobre ? `${(item.pct - item.meta).toFixed(1)}% sobre meta` : `${(item.meta - item.pct).toFixed(1)}% bajo meta`}
+              </div>
+            </div>
+          );
+        };
+        return (
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 11.5, color: "#666", fontWeight: 600, textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 10 }}>Distribución del ingreso · Regla 50/30/20</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }} className="dash-2col">
+              <BucketCard label="Necesidades" item={di.necesidades} color="#f59e0b" />
+              <BucketCard label="Deseos" item={di.deseos} color="#8b5cf6" />
+              <BucketCard label="Ahorro + Deuda" item={di.ahorro_deuda} color="#10b981" />
+            </div>
+          </div>
+        );
+      })()}
 
       {/* fila gráficas 1 + 2 */}
       <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 14, marginBottom: 16 }} className="dash-2col">
@@ -165,6 +205,13 @@ function Dashboard({ tw, onNav }) {
                   detail={`Vence ${fmtDate(dd.fecha_pago)} · ${fmtMoney(dd.saldo_restante)}`}
                   right={<Badge color="#f59e0b">{dd.dias}d</Badge>} />
               )) : <div style={{ fontSize: 12.5, color: "#666", padding: "10px 0" }}>Sin vencimientos cercanos.</div>}
+            </div>
+            <div>
+              <div style={{ fontSize: 11.5, color: "#888", fontWeight: 600, marginBottom: 4, textTransform: "uppercase", letterSpacing: ".05em" }}>Ratio de endeudamiento</div>
+              {endeudamientoAlto
+                ? <AlertRow color="#ef4444" icon="debt" title={`Ratio de endeudamiento alto: ${k.ratio_endeudamiento.toFixed(0)}%`}
+                    detail={`Pagos de deuda ocupan más del 30% del ingreso · límite recomendado`} />
+                : <div style={{ fontSize: 12.5, color: "#666", padding: "10px 0" }}>Ratio OK: {k.ratio_endeudamiento.toFixed(0)}% del ingreso.</div>}
             </div>
             <div>
               <div style={{ fontSize: 11.5, color: "#888", fontWeight: 600, marginBottom: 4, textTransform: "uppercase", letterSpacing: ".05em" }}>Metas críticas</div>

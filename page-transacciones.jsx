@@ -91,8 +91,10 @@ function Transacciones() {
 
   const toggleSort = (key) => setSort((s) => s.key === key ? { key, dir: -s.dir } : { key, dir: key === "fecha" || key === "monto" ? -1 : 1 });
 
-  const ingresos = list.filter((t) => t.tipo === "Ingreso").reduce((s, t) => s + t.monto, 0);
-  const gastos = list.filter((t) => t.tipo === "Gasto" || t.tipo === "Pago de deuda").reduce((s, t) => s + t.monto, 0);
+  const ingresos    = list.filter((t) => t.tipo === "Ingreso").reduce((s, t) => s + t.monto, 0);
+  const gastos      = list.filter((t) => t.tipo === "Gasto").reduce((s, t) => s + t.monto, 0);
+  const ahorrado    = list.filter((t) => t.tipo === "Ahorro").reduce((s, t) => s + t.monto, 0);
+  const pagos_deuda = list.filter((t) => t.tipo === "Pago de deuda").reduce((s, t) => s + t.monto, 0);
 
   const anios = [...new Set(S.getTransacciones().map((t) => t.anio))].sort((a, b) => b - a);
   const Th = ({ k, children, align = "left" }) => (
@@ -107,10 +109,11 @@ function Transacciones() {
         actions={<Button variant="primary" icon="plus" onClick={() => { setEditing(null); setDrawer(true); }}>Nueva transacción</Button>} />
 
       {/* resumen */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 14, marginBottom: 16 }}>
-        <Card pad={15}><div style={{ fontSize: 11.5, color: "#888", marginBottom: 6 }}>Ingresos del periodo</div><div style={{ fontSize: 19, fontWeight: 600, fontFamily: "var(--mono)", color: "#10b981" }}>{fmtMoney(ingresos)}</div></Card>
-        <Card pad={15}><div style={{ fontSize: 11.5, color: "#888", marginBottom: 6 }}>Gastos del periodo</div><div style={{ fontSize: 19, fontWeight: 600, fontFamily: "var(--mono)", color: "#ef4444" }}>{fmtMoney(gastos)}</div></Card>
-        <Card pad={15}><div style={{ fontSize: 11.5, color: "#888", marginBottom: 6 }}>Balance</div><div style={{ fontSize: 19, fontWeight: 600, fontFamily: "var(--mono)", color: ingresos - gastos >= 0 ? "#10b981" : "#ef4444" }}>{fmtMoney(ingresos - gastos)}</div></Card>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 14, marginBottom: 16 }}>
+        <Card pad={15}><div style={{ fontSize: 11.5, color: "#888", marginBottom: 6 }}>Ingresos</div><div style={{ fontSize: 19, fontWeight: 600, fontFamily: "var(--mono)", color: "#10b981" }}>{fmtMoney(ingresos)}</div></Card>
+        <Card pad={15}><div style={{ fontSize: 11.5, color: "#888", marginBottom: 6 }}>Gastos</div><div style={{ fontSize: 19, fontWeight: 600, fontFamily: "var(--mono)", color: "#ef4444" }}>{fmtMoney(gastos)}</div></Card>
+        <Card pad={15}><div style={{ fontSize: 11.5, color: "#888", marginBottom: 6 }}>Ahorrado</div><div style={{ fontSize: 19, fontWeight: 600, fontFamily: "var(--mono)", color: "#22c55e" }}>{fmtMoney(ahorrado)}</div></Card>
+        <Card pad={15}><div style={{ fontSize: 11.5, color: "#888", marginBottom: 6 }}>Balance</div><div style={{ fontSize: 19, fontWeight: 600, fontFamily: "var(--mono)", color: (ingresos - gastos - ahorrado - pagos_deuda) >= 0 ? "#10b981" : "#ef4444" }}>{fmtMoney(ingresos - gastos - ahorrado - pagos_deuda)}</div></Card>
       </div>
 
       {/* filtros */}
