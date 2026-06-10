@@ -113,7 +113,7 @@ function Transacciones() {
         <Card pad={15}><div style={{ fontSize: 11.5, color: "#888", marginBottom: 6 }}>Ingresos</div><div style={{ fontSize: 19, fontWeight: 600, fontFamily: "var(--mono)", color: "#10b981" }}>{fmtMoney(ingresos)}</div></Card>
         <Card pad={15}><div style={{ fontSize: 11.5, color: "#888", marginBottom: 6 }}>Gastos</div><div style={{ fontSize: 19, fontWeight: 600, fontFamily: "var(--mono)", color: "#ef4444" }}>{fmtMoney(gastos)}</div></Card>
         <Card pad={15}><div style={{ fontSize: 11.5, color: "#888", marginBottom: 6 }}>Ahorrado</div><div style={{ fontSize: 19, fontWeight: 600, fontFamily: "var(--mono)", color: "#22c55e" }}>{fmtMoney(ahorrado)}</div></Card>
-        <Card pad={15}><div style={{ fontSize: 11.5, color: "#888", marginBottom: 6 }}>Balance</div><div style={{ fontSize: 19, fontWeight: 600, fontFamily: "var(--mono)", color: (ingresos - gastos - ahorrado - pagos_deuda) >= 0 ? "#10b981" : "#ef4444" }}>{fmtMoney(ingresos - gastos - ahorrado - pagos_deuda)}</div></Card>
+        <Card pad={15}><div style={{ fontSize: 11.5, color: "#888", marginBottom: 6 }}>Balance</div><div style={{ fontSize: 19, fontWeight: 600, fontFamily: "var(--mono)", color: (ingresos - gastos - pagos_deuda) >= 0 ? "#10b981" : "#ef4444" }}>{fmtMoney(ingresos - gastos - pagos_deuda)}</div></Card>
       </div>
 
       {/* filtros */}

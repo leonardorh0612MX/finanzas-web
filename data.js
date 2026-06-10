@@ -292,7 +292,7 @@
     DB.transacciones.forEach((t) => {
       if (t.tipo === "Ingreso" && t.cuenta === cuentaId) balance += t.monto;
       else if ((t.tipo === "Gasto" || t.tipo === "Pago de deuda") && t.cuenta === cuentaId) balance -= t.monto;
-      else if (t.tipo === "Ahorro" && t.cuenta === cuentaId) balance -= t.monto;
+      else if (t.tipo === "Ahorro" && t.cuenta === cuentaId) balance += t.monto;
       else if (t.tipo === "Transferencia") {
         if (t.cuenta === cuentaId) balance -= t.monto;
         if (t.cuenta_destino === cuentaId) balance += t.monto;

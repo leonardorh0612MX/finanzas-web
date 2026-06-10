@@ -1,0 +1,13 @@
+# Nunca metas datos personales ni basura en la imagen
+finanzas_data.json
+.git
+.gitignore
+.github
+__pycache__/
+*.pyc
+.venv/
+screenshots/
+.DS_Store
+Thumbs.db
+README.md
+start.bat

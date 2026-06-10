@@ -114,14 +114,15 @@ def open_browser():
 
 
 if __name__ == "__main__":
-    server = HTTPServer(("localhost", PORT), Handler)
+    server = HTTPServer(("0.0.0.0", PORT), Handler)
     print(f"")
     print(f"  FinanzasOS arriba en:  http://localhost:{PORT}")
     print(f"  Datos guardados en:    finanzas_data.json")
     print(f"  Ctrl+C para cerrar")
     print(f"")
-    # Abrir navegador después de 0.8s (dar tiempo al servidor de arrancar)
-    threading.Timer(0.8, open_browser).start()
+    # Abrir navegador después de 0.8s (se omite en contenedor / headless con NO_BROWSER=1)
+    if os.environ.get("NO_BROWSER") != "1":
+        threading.Timer(0.8, open_browser).start()
     try:
         server.serve_forever()
     except KeyboardInterrupt:
