@@ -1,6 +1,8 @@
 /* page-dashboard.jsx — vista analítica principal */
 
-function KpiCard({ label, value, sub, color = "#eaeaea", icon, accent, delay = 0 }) {
+function KpiCard({ label, value, sub, color = "#eaeaea", icon, accent, delay = 0, delta, deltaInvert }) {
+  const dtColor = delta == null ? null : ((delta > 0) !== !!deltaInvert) ? "#10b981" : "#ef4444";
+  const dtText  = delta == null ? null : `${delta > 0 ? "▲" : "▼"} ${Math.abs(delta)}% vs mes ant.`;
   return (
     <Card pad={16} className="fade-up" style={{ animationDelay: `${delay}s` }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
@@ -9,6 +11,7 @@ function KpiCard({ label, value, sub, color = "#eaeaea", icon, accent, delay = 0
       </div>
       <div style={{ fontSize: 22, fontWeight: 600, fontFamily: "var(--mono)", color, letterSpacing: "-0.01em" }}>{value}</div>
       {sub && <div style={{ fontSize: 11.5, color: "#777", marginTop: 5 }}>{sub}</div>}
+      {dtText && <div style={{ fontSize: 10.5, color: dtColor, marginTop: 4, fontFamily: "var(--mono)" }}>{dtText}</div>}
     </Card>
   );
 }
@@ -47,18 +50,41 @@ function Dashboard({ tw, onNav }) {
   const k = d.kpis;
   const balPos = k.balance_mes >= 0;
   const totalAlertas = d.alertas.presupuestos_excedidos.length + d.alertas.deudas_proximas.length + d.alertas.metas_criticas.length;
+  const pct = (a, b) => (!b) ? null : +((a - b) / b * 100).toFixed(0);
 
   return (
     <div>
       <PageHeader title="Dashboard" subtitle={`Resumen de ${window.FinanzasStore.nombreMes[window.FinanzasStore.MES_ACTUAL]} ${window.FinanzasStore.ANIO_ACTUAL} · Leonardo`} />
 
       {/* KPIs */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 14, marginBottom: 16 }}>
-        <KpiCard label="Saldo total" value={fmtMoney(k.saldo_total)} sub="Cuentas activas" icon="wallet" accent="#3b82f6" delay={0} />
-        <KpiCard label="Ingresos del mes" value={fmtMoney(k.ingresos_mes)} color={tw.ingColor} icon="up" accent={tw.ingColor} delay={0.05} />
-        <KpiCard label="Gastos del mes" value={fmtMoney(k.gastos_mes)} color={tw.gasColor} icon="down" accent={tw.gasColor} delay={0.1} />
-        <KpiCard label="Balance neto" value={fmtMoney(k.balance_mes)} color={balPos ? tw.ingColor : tw.gasColor} sub={balPos ? "Superávit" : "Déficit"} icon="trend" accent={balPos ? tw.ingColor : tw.gasColor} delay={0.15} />
-        <KpiCard label="Deuda activa" value={fmtMoney(k.deuda_total)} color="#f59e0b" sub="Saldo restante" icon="debt" accent="#f59e0b" delay={0.2} />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(175px, 1fr))", gap: 14, marginBottom: 16 }}>
+        <KpiCard label="Patrimonio neto"
+          value={fmtMoney(k.patrimonio_neto)}
+          sub={`Activos ${fmtMoneyShort(k.activos)} · Pasivos ${fmtMoneyShort(k.pasivos)}`}
+          color={k.patrimonio_neto >= 0 ? "#3b82f6" : "#ef4444"}
+          icon="wallet" accent="#3b82f6" delay={0} />
+        <KpiCard label="Ingresos del mes"
+          value={fmtMoney(k.ingresos_mes)} color={tw.ingColor}
+          icon="up" accent={tw.ingColor} delay={0.04}
+          delta={pct(k.ingresos_mes, k.comp.ingresos_ant)} />
+        <KpiCard label="Gastos del mes"
+          value={fmtMoney(k.gastos_mes)} color={tw.gasColor}
+          sub="Excl. pagos de deuda" icon="down" accent={tw.gasColor} delay={0.08}
+          delta={pct(k.gastos_mes, k.comp.gastos_ant)} deltaInvert />
+        <KpiCard label="Tasa de ahorro"
+          value={`${k.tasa_ahorro.toFixed(1)}%`}
+          sub={`${fmtMoneyShort(k.ahorro_mes)} ahorrado`}
+          color={k.tasa_ahorro >= 20 ? "#10b981" : k.tasa_ahorro >= 10 ? "#f59e0b" : "#ef4444"}
+          icon="piggy" accent="#10b981" delay={0.12}
+          delta={pct(k.tasa_ahorro, k.comp.tasa_ahorro_ant)} />
+        <KpiCard label="Balance neto"
+          value={fmtMoney(k.balance_mes)}
+          color={balPos ? tw.ingColor : tw.gasColor} sub={balPos ? "Superávit" : "Déficit"}
+          icon="trend" accent={balPos ? tw.ingColor : tw.gasColor} delay={0.16}
+          delta={pct(k.balance_mes, k.comp.balance_ant)} />
+        <KpiCard label="Deuda activa"
+          value={fmtMoney(k.deuda_total)} color="#f59e0b"
+          sub="Saldo restante" icon="debt" accent="#f59e0b" delay={0.2} />
       </div>
 
       {/* fila gráficas 1 + 2 */}

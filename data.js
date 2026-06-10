@@ -292,7 +292,7 @@
     DB.transacciones.forEach((t) => {
       if (t.tipo === "Ingreso" && t.cuenta === cuentaId) balance += t.monto;
       else if ((t.tipo === "Gasto" || t.tipo === "Pago de deuda") && t.cuenta === cuentaId) balance -= t.monto;
-      else if (t.tipo === "Ahorro" && t.cuenta === cuentaId) balance += t.monto;
+      else if (t.tipo === "Ahorro" && t.cuenta === cuentaId) balance -= t.monto;
       else if (t.tipo === "Transferencia") {
         if (t.cuenta === cuentaId) balance -= t.monto;
         if (t.cuenta_destino === cuentaId) balance += t.monto;
@@ -323,7 +323,21 @@
   function metaConDerivados(m) {
     const porcentaje = m.monto_objetivo > 0 ? money((m.monto_actual / m.monto_objetivo) * 100) : 0;
     const faltante = money(Math.max(0, m.monto_objetivo - m.monto_actual));
-    return { ...m, porcentaje, faltante, estado: estadoMeta(porcentaje) };
+    // Proyección: promedio mensual de Ahorro vinculado a esta meta (últimos 3 meses)
+    let proyeccion_meses = null;
+    if (faltante > 0) {
+      let totalAhorro = 0;
+      for (let back = 1; back <= 3; back++) {
+        let y = ANIO_ACTUAL, mes = MES_ACTUAL - back;
+        while (mes <= 0) { mes += 12; y -= 1; }
+        totalAhorro += DB.transacciones
+          .filter(t => t.tipo === "Ahorro" && t.meta === m.id && t.mes === mes && t.anio === y)
+          .reduce((s, t) => s + t.monto, 0);
+      }
+      const promedio = totalAhorro / 3;
+      if (promedio > 0) proyeccion_meses = Math.ceil(faltante / promedio);
+    }
+    return { ...m, porcentaje, faltante, estado: estadoMeta(porcentaje), proyeccion_meses };
   }
 
   // -------------------- API SELECTORS --------------------
@@ -362,11 +376,31 @@
     const cuentasActivas = getCuentas().filter((c) => c.activa);
     const saldo_total = money(cuentasActivas.reduce((s, c) => s + c.saldo_actual, 0));
 
+    // Patrimonio Neto = activos brutos - pasivos tarjetas - deudas externas
+    const activos = money(cuentasActivas.reduce((s, c) => s + Math.max(0, c.saldo_actual), 0));
+    const pasivos_cuentas = money(cuentasActivas.filter(c => c.tipo === "Crédito").reduce((s, c) => s + Math.abs(Math.min(0, c.saldo_actual)), 0));
+    const pasivos_deudas = money(getDeudas().filter(d => d.estado !== "Liquidada").reduce((s, d) => s + d.saldo_restante, 0));
+    const pasivos = money(pasivos_cuentas + pasivos_deudas);
+    const patrimonio_neto = money(activos - pasivos);
+
     const txMes = DB.transacciones.filter((t) => t.mes === MES_ACTUAL && t.anio === ANIO_ACTUAL);
     const ingresos_mes = money(txMes.filter((t) => t.tipo === "Ingreso").reduce((s, t) => s + t.monto, 0));
-    const gastos_mes = money(txMes.filter((t) => t.tipo === "Gasto" || t.tipo === "Pago de deuda").reduce((s, t) => s + t.monto, 0));
-    const balance_mes = money(ingresos_mes - gastos_mes);
+    const gastos_mes = money(txMes.filter((t) => t.tipo === "Gasto").reduce((s, t) => s + t.monto, 0));
+    const pagos_deuda_mes = money(txMes.filter((t) => t.tipo === "Pago de deuda").reduce((s, t) => s + t.monto, 0));
+    const ahorro_mes = money(txMes.filter((t) => t.tipo === "Ahorro").reduce((s, t) => s + t.monto, 0));
+    const tasa_ahorro = ingresos_mes > 0 ? money((ahorro_mes / ingresos_mes) * 100) : 0;
+    const balance_mes = money(ingresos_mes - gastos_mes - pagos_deuda_mes);
     const deuda_total = money(getDeudas().filter((d) => d.estado !== "Liquidada").reduce((s, d) => s + d.saldo_restante, 0));
+
+    // Comparativa mes anterior
+    let meAnt = MES_ACTUAL - 1, anAnt = ANIO_ACTUAL;
+    if (meAnt <= 0) { meAnt = 12; anAnt -= 1; }
+    const txAnt = DB.transacciones.filter(t => t.mes === meAnt && t.anio === anAnt);
+    const ingresos_ant = money(txAnt.filter(t => t.tipo === "Ingreso").reduce((s, t) => s + t.monto, 0));
+    const gastos_ant = money(txAnt.filter(t => t.tipo === "Gasto").reduce((s, t) => s + t.monto, 0));
+    const ahorro_ant = money(txAnt.filter(t => t.tipo === "Ahorro").reduce((s, t) => s + t.monto, 0));
+    const tasa_ahorro_ant = ingresos_ant > 0 ? money((ahorro_ant / ingresos_ant) * 100) : 0;
+    const balance_ant = money(ingresos_ant - gastos_ant - money(txAnt.filter(t => t.tipo === "Pago de deuda").reduce((s, t) => s + t.monto, 0)));
 
     // flujo mensual últimos 6 meses
     const flujo_mensual = [];
@@ -416,7 +450,8 @@
     });
 
     return {
-      kpis: { saldo_total, ingresos_mes, gastos_mes, balance_mes, deuda_total },
+      kpis: { saldo_total, patrimonio_neto, activos, pasivos, ingresos_mes, gastos_mes, pagos_deuda_mes, ahorro_mes, tasa_ahorro, balance_mes, deuda_total,
+        comp: { ingresos_ant, gastos_ant, tasa_ahorro_ant, balance_ant } },
       flujo_mensual, gastos_por_categoria, tendencia_balance, presupuestos_mes,
       alertas: { presupuestos_excedidos, deudas_proximas, metas_criticas },
     };
@@ -425,11 +460,15 @@
   // -------------------- MUTACIONES --------------------
   function addTransaccion(data) {
     const [y, m] = data.fecha.split("-").map(Number);
-    const t = { id: nextId(), notas: "", cuenta: null, cuenta_destino: null, deuda: null, ...data, monto: money(+data.monto), mes: m, anio: y };
+    const t = { id: nextId(), notas: "", cuenta: null, cuenta_destino: null, deuda: null, meta: null, ...data, monto: money(+data.monto), mes: m, anio: y };
     DB.transacciones.push(t);
     if (t.tipo === "Pago de deuda" && t.deuda) {
       const d = DB.deudas.find((x) => x.id === +t.deuda);
       if (d) d.pagado = money(Math.min(d.monto_total, d.pagado + t.monto));
+    }
+    if (t.tipo === "Ahorro" && t.meta) {
+      const mt = DB.metas.find((x) => x.id === +t.meta);
+      if (mt) mt.monto_actual = money(mt.monto_actual + t.monto);
     }
     save();
     return t;
@@ -437,12 +476,30 @@
   function updateTransaccion(id, data) {
     const i = DB.transacciones.findIndex((t) => t.id === id);
     if (i < 0) return;
-    const [y, m] = data.fecha.split("-").map(Number);
-    DB.transacciones[i] = { ...DB.transacciones[i], ...data, monto: money(+data.monto), mes: m, anio: y,
-      cuenta_destino: data.tipo === "Transferencia" && data.cuenta_destino ? +data.cuenta_destino : null };
+    const old = DB.transacciones[i];
+    // Revertir efecto anterior en meta
+    if (old.tipo === "Ahorro" && old.meta) {
+      const mt = DB.metas.find((x) => x.id === old.meta);
+      if (mt) mt.monto_actual = money(Math.max(0, mt.monto_actual - old.monto));
+    }
+    const [y, mo] = data.fecha.split("-").map(Number);
+    DB.transacciones[i] = { ...old, ...data, monto: money(+data.monto), mes: mo, anio: y,
+      cuenta_destino: data.tipo === "Transferencia" && data.cuenta_destino ? +data.cuenta_destino : null,
+      meta: data.tipo === "Ahorro" && data.meta ? +data.meta : null };
+    // Aplicar nuevo efecto en meta
+    const upd = DB.transacciones[i];
+    if (upd.tipo === "Ahorro" && upd.meta) {
+      const mt = DB.metas.find((x) => x.id === upd.meta);
+      if (mt) mt.monto_actual = money(mt.monto_actual + upd.monto);
+    }
     save();
   }
   function deleteTransaccion(id) {
+    const t = DB.transacciones.find((x) => x.id === id);
+    if (t && t.tipo === "Ahorro" && t.meta) {
+      const mt = DB.metas.find((x) => x.id === t.meta);
+      if (mt) mt.monto_actual = money(Math.max(0, mt.monto_actual - t.monto));
+    }
     DB.transacciones = DB.transacciones.filter((t) => t.id !== id);
     save();
   }

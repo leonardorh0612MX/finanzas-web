@@ -89,9 +89,18 @@ function MetaCard({ m, onUpdate, onEdit, onDelete }) {
         </div>
       </div>
 
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12, color: "#888", borderTop: "1px solid var(--border)", paddingTop: 11 }}>
-        <span style={{ display: "flex", alignItems: "center", gap: 6 }}><Icon name="clock" size={13} />{fmtDate(m.fecha_objetivo)}</span>
-        <span style={{ color: dias < 0 ? "#ef4444" : dias < 90 ? "#f59e0b" : "#888", fontFamily: "var(--mono)" }}>{dias < 0 ? `${Math.abs(dias)}d vencida` : `${dias}d restantes`}</span>
+      <div style={{ borderTop: "1px solid var(--border)", paddingTop: 11 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12, color: "#888" }}>
+          <span style={{ display: "flex", alignItems: "center", gap: 6 }}><Icon name="clock" size={13} />{fmtDate(m.fecha_objetivo)}</span>
+          <span style={{ color: dias < 0 ? "#ef4444" : dias < 90 ? "#f59e0b" : "#888", fontFamily: "var(--mono)" }}>{dias < 0 ? `${Math.abs(dias)}d vencida` : `${dias}d restantes`}</span>
+        </div>
+        {m.porcentaje < 100 && (
+          <div style={{ marginTop: 7, fontSize: 11.5, display: "flex", alignItems: "center", gap: 5 }}>
+            {m.proyeccion_meses != null
+              ? <><span style={{ color: "#10b981" }}>◎</span><span style={{ color: "#777" }}>A este ritmo: <span style={{ color: "#aaa", fontFamily: "var(--mono)" }}>~{m.proyeccion_meses} mes{m.proyeccion_meses !== 1 ? "es" : ""} más</span></span></>
+              : <><span style={{ color: "#555" }}>◎</span><span style={{ color: "#555" }}>Vincula ahorros para ver proyección</span></>}
+          </div>
+        )}
       </div>
 
       <div style={{ display: "flex", gap: 6 }}>

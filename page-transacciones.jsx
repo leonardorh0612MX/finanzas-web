@@ -5,7 +5,7 @@ const TIPO_COLOR = { "Ingreso": "#10b981", "Gasto": "#ef4444", "Pago de deuda": 
 function TransaccionForm({ initial, onClose }) {
   const S = window.FinanzasStore;
   const toast = useToast();
-  const [f, setF] = React.useState(initial || { nombre: "", fecha: todayISO(), tipo: "Gasto", monto: "", categoria: "Alimentación", subcategoria: "", cuenta: "", cuenta_destino: "", deuda: "", notas: "" });
+  const [f, setF] = React.useState(initial || { nombre: "", fecha: todayISO(), tipo: "Gasto", monto: "", categoria: "Alimentación", subcategoria: "", cuenta: "", cuenta_destino: "", deuda: "", meta: "", notas: "" });
   const [err, setErr] = React.useState({});
   const set = (k) => (v) => setF((s) => ({ ...s, [k]: v }));
   const cuentas = S.getCuentas();
@@ -18,7 +18,7 @@ function TransaccionForm({ initial, onClose }) {
     if (!(+f.monto > 0)) e.monto = "El monto debe ser mayor a 0";
     setErr(e);
     if (Object.keys(e).length) return;
-    const payload = { ...f, monto: +f.monto, cuenta: f.cuenta ? +f.cuenta : null, cuenta_destino: f.tipo === "Transferencia" && f.cuenta_destino ? +f.cuenta_destino : null, deuda: f.tipo === "Pago de deuda" && f.deuda ? +f.deuda : null };
+    const payload = { ...f, monto: +f.monto, cuenta: f.cuenta ? +f.cuenta : null, cuenta_destino: f.tipo === "Transferencia" && f.cuenta_destino ? +f.cuenta_destino : null, deuda: f.tipo === "Pago de deuda" && f.deuda ? +f.deuda : null, meta: f.tipo === "Ahorro" && f.meta ? +f.meta : null };
     if (initial && initial.id) { S.updateTransaccion(initial.id, payload); toast("Transacción actualizada"); }
     else { S.addTransaccion(payload); toast("Transacción guardada"); }
     onClose();
@@ -50,6 +50,12 @@ function TransaccionForm({ initial, onClose }) {
         {f.tipo === "Pago de deuda" && (
           <Field label="Deuda vinculada" hint="El pago se sumará al avance de la deuda">
             <Select value={f.deuda} onChange={set("deuda")} placeholder="— Selecciona deuda —" options={deudas.map((d) => ({ value: d.id, label: `${d.nombre} · resta ${fmtMoneyShort(d.saldo_restante)}` }))} />
+          </Field>
+        )}
+        {f.tipo === "Ahorro" && (
+          <Field label="Meta vinculada (opcional)" hint="El monto se sumará automáticamente al avance de la meta">
+            <Select value={f.meta || ""} onChange={set("meta")} placeholder="— Ninguna —"
+              options={S.getMetas().filter(m => m.estado !== "Completada").map(m => ({ value: m.id, label: `${m.nombre} · ${fmtMoneyShort(m.faltante)} faltante` }))} />
           </Field>
         )}
         <Field label="Notas"><Textarea value={f.notas} onChange={set("notas")} placeholder="Opcional" /></Field>
@@ -142,7 +148,7 @@ function Transacciones() {
                     <td style={{ padding: "11px 12px", fontSize: 12.5 }}><span style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "#bbb" }}><span style={{ width: 7, height: 7, borderRadius: 2, background: CAT_COLORS[t.categoria] || "#888" }}></span>{t.categoria}</span></td>
                     <td style={{ padding: "11px 12px" }}><Badge color={TIPO_COLOR[t.tipo]}>{t.tipo}</Badge></td>
                     <td style={{ padding: "11px 12px", textAlign: "right", fontFamily: "var(--mono)", fontSize: 13, fontWeight: 600, whiteSpace: "nowrap", color: TIPO_COLOR[t.tipo] }}>
-                      {t.tipo === "Ingreso" ? "+" : t.tipo === "Gasto" || t.tipo === "Pago de deuda" ? "−" : ""}{fmtMoney(t.monto)}
+                      {t.tipo === "Ingreso" ? "+" : (t.tipo === "Gasto" || t.tipo === "Pago de deuda" || t.tipo === "Ahorro") ? "−" : ""}{fmtMoney(t.monto)}
                     </td>
                     <td style={{ padding: "11px 12px", fontSize: 12.5, color: "#999", whiteSpace: "nowrap" }}>
                       {t.tipo === "Transferencia" && t.cuenta_destino
