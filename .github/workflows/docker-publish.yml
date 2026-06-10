@@ -3,14 +3,14 @@ name: Build and push Docker image
 on:
   push:
     branches: [ main ]
-  workflow_dispatch:        # permite correrlo a mano desde la pestaña Actions
+  workflow_dispatch:   
 
 env:
-  IMAGE: ghcr.io/leonardorh0612mx/finanzas-web   # GHCR requiere minúsculas
+  IMAGE: ghcr.io/leonardorh0612mx/finanzas-web  
 
 permissions:
   contents: read
-  packages: write           # necesario para publicar en GHCR
+  packages: write          
 
 jobs:
   build-and-push:
