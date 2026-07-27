@@ -7,7 +7,7 @@ function CuentaForm({ initial, onClose }) {
   const toast = useToast();
   const isEditing = !!(initial && initial.id);
   const [f, setF] = React.useState(isEditing
-    ? { nombre: initial.nombre, tipo: initial.tipo, banco: initial.banco || "", notas: initial.notas || "" }
+    ? { nombre: initial.nombre, tipo: initial.tipo, banco: initial.banco || "", notas: initial.notas || "", saldo_inicial: initial.saldo_inicial !== undefined ? initial.saldo_inicial : (initial.saldo || 0) }
     : { nombre: "", tipo: "Débito", banco: "", saldo: "", notas: "" });
   const [err, setErr] = React.useState({});
   const set = (k) => (v) => setF((s) => ({ ...s, [k]: v }));
@@ -22,7 +22,7 @@ function CuentaForm({ initial, onClose }) {
   return (
     <>
       <Field label="Nombre" error={err.nombre}><TextInput value={f.nombre} onChange={set("nombre")} placeholder="Ej. BBVA Nómina" /></Field>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+      <div className="m-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         <Field label="Tipo"><Select value={f.tipo} onChange={set("tipo")} options={["Débito", "Crédito", "Efectivo", "Inversión"]} /></Field>
         <Field label="Banco / Institución"><TextInput value={f.banco} onChange={set("banco")} placeholder="Ej. BBVA" /></Field>
       </div>
@@ -40,6 +40,11 @@ function CuentaForm({ initial, onClose }) {
       ) : (
         <Field label="Saldo inicial (MXN)" hint="Punto de partida — el saldo actual se calcula sumando tus transacciones">
           <TextInput type="number" mono value={f.saldo} onChange={set("saldo")} placeholder="0.00" />
+        </Field>
+      )}
+      {isEditing && (
+        <Field label="Corregir saldo inicial (MXN)" hint="⚠ Solo ajusta si el punto de partida estaba mal al crear la cuenta">
+          <TextInput type="number" mono value={f.saldo_inicial} onChange={set("saldo_inicial")} placeholder="0.00" />
         </Field>
       )}
       <Field label="Notas"><Textarea value={f.notas} onChange={set("notas")} placeholder="Opcional" /></Field>

@@ -19,7 +19,7 @@ function KpiCard({ label, value, sub, color = "#eaeaea", icon, accent, delay = 0
 function ChartCard({ title, subtitle, children, right, style }) {
   return (
     <Card pad={20} style={style}>
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 18 }}>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 18 }}>
         <div>
           <h3 style={{ fontSize: 14.5, fontWeight: 600, margin: 0 }}>{title}</h3>
           {subtitle && <p style={{ margin: "3px 0 0", fontSize: 12, color: "#777" }}>{subtitle}</p>}
@@ -58,7 +58,7 @@ function Dashboard({ tw, onNav }) {
       <PageHeader title="Dashboard" subtitle={`Resumen de ${window.FinanzasStore.nombreMes[window.FinanzasStore.MES_ACTUAL]} ${window.FinanzasStore.ANIO_ACTUAL} · Leonardo`} />
 
       {/* KPIs */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(175px, 1fr))", gap: 14, marginBottom: 16 }}>
+      <div className="m-grid-2" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(175px, 1fr))", gap: 14, marginBottom: 16 }}>
         <KpiCard label="Patrimonio neto"
           value={fmtMoney(k.patrimonio_neto)}
           sub={`Activos ${fmtMoneyShort(k.activos)} · Pasivos ${fmtMoneyShort(k.pasivos)}`}
@@ -118,7 +118,7 @@ function Dashboard({ tw, onNav }) {
         return (
           <div style={{ marginBottom: 16 }}>
             <div style={{ fontSize: 11.5, color: "#666", fontWeight: 600, textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 10 }}>Distribución del ingreso · Regla 50/30/20</div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }} className="dash-2col">
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }} className="dash-2col m-grid">
               <BucketCard label="Necesidades" item={di.necesidades} color="#f59e0b" />
               <BucketCard label="Deseos" item={di.deseos} color="#8b5cf6" />
               <BucketCard label="Ahorro + Deuda" item={di.ahorro_deuda} color="#10b981" />
@@ -128,26 +128,26 @@ function Dashboard({ tw, onNav }) {
       })()}
 
       {/* fila gráficas 1 + 2 */}
-      <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 14, marginBottom: 16 }} className="dash-2col">
-        <ChartCard title="Flujo de ingresos vs gastos" subtitle="Últimos 6 meses"
+      <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 14, marginBottom: 16 }} className="dash-2col m-grid">
+        <ChartCard title="Flujo de ingresos vs gastos" subtitle="Últimos 6 meses" style={{ minWidth: 0, overflow: "hidden" }}
           right={<div style={{ display: "flex", gap: 14, fontSize: 11.5 }}>
             <span style={{ display: "flex", alignItems: "center", gap: 5, color: "#aaa" }}><span style={{ width: 9, height: 9, borderRadius: 2, background: tw.ingColor }}></span>Ingresos</span>
             <span style={{ display: "flex", alignItems: "center", gap: 5, color: "#aaa" }}><span style={{ width: 9, height: 9, borderRadius: 2, background: tw.gasColor }}></span>Gastos</span>
           </div>}>
           <GroupedBarChart data={d.flujo_mensual} ingColor={tw.ingColor} gasColor={tw.gasColor} />
         </ChartCard>
-        <ChartCard title="Gastos por categoría" subtitle="Mes actual">
+        <ChartCard title="Gastos por categoría" subtitle="Mes actual" style={{ minWidth: 0, overflow: "hidden" }}>
           {d.gastos_por_categoria.length ? <DonutChart data={d.gastos_por_categoria} colors={tw.catColors} />
             : <EmptyState icon="budget" title="Sin gastos aún" hint="Registra transacciones para ver el desglose." />}
         </ChartCard>
       </div>
 
       {/* fila gráficas 3 + 4 */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 16 }} className="dash-2col">
-        <ChartCard title="Tendencia de balance neto" subtitle="Últimos 12 meses">
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 16 }} className="dash-2col m-grid">
+        <ChartCard title="Tendencia de balance neto" subtitle="Últimos 12 meses" style={{ minWidth: 0, overflow: "hidden" }}>
           <AreaLineChart data={d.tendencia_balance} posColor={tw.ingColor} negColor={tw.gasColor} />
         </ChartCard>
-        <ChartCard title="Estado de presupuestos" subtitle="Mes actual"
+        <ChartCard title="Estado de presupuestos" subtitle="Mes actual" style={{ minWidth: 0, overflow: "hidden" }}
           right={<Button size="sm" variant="ghost" onClick={() => onNav("presupuestos")}>Ver todos</Button>}>
           {d.presupuestos_mes.length ? (
             <>
@@ -158,7 +158,7 @@ function Dashboard({ tw, onNav }) {
                 const dispVar   = vars.reduce((s, p) => s + p.presupuesto, 0) - vars.reduce((s, p) => s + p.gasto_actual, 0);
                 if (!fijos.length && !vars.length) return null;
                 return (
-                  <div style={{ display: "grid", gridTemplateColumns: fijos.length && vars.length ? "1fr 1fr" : "1fr", gap: 10, marginBottom: 14 }}>
+                  <div className="m-grid" style={{ display: "grid", gridTemplateColumns: fijos.length && vars.length ? "1fr 1fr" : "1fr", gap: 10, marginBottom: 14 }}>
                     {fijos.length > 0 && (
                       <div style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)", borderRadius: 10, padding: "12px 14px" }}>
                         <div style={{ fontSize: 10.5, color: "#888", textTransform: "uppercase", letterSpacing: ".06em", fontWeight: 600, marginBottom: 5 }}>Fijos · Resta de pagar</div>

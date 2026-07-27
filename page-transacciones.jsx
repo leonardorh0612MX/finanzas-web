@@ -33,14 +33,14 @@ function TransaccionForm({ initial, onClose }) {
           <Field label="Tipo"><Select value={f.tipo} onChange={set("tipo")} options={S.TIPOS} /></Field>
         </div>
         {(() => { const subs = S.getSubcategorias(f.categoria); return (
-          <div style={{ display: "grid", gridTemplateColumns: subs.length ? "1fr 1fr 1fr" : "1fr 1fr", gap: 12 }}>
+          <div className="m-grid" style={{ display: "grid", gridTemplateColumns: subs.length ? "1fr 1fr 1fr" : "1fr 1fr", gap: 12 }}>
             <Field label="Monto (MXN)" error={err.monto}><TextInput type="number" mono value={f.monto} onChange={set("monto")} placeholder="0.00" /></Field>
             <Field label="Categoría"><Select value={f.categoria} onChange={(v) => { set("categoria")(v); set("subcategoria")(""); }} options={S.getCategorias()} /></Field>
             {subs.length > 0 && <Field label="Subcategoría"><Select value={f.subcategoria} onChange={set("subcategoria")} placeholder="— General —" options={subs} /></Field>}
           </div>
         ); })()}
         {f.tipo === "Transferencia" ? (
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div className="m-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <Field label="Cuenta origen"><Select value={f.cuenta} onChange={set("cuenta")} placeholder="— Selecciona —" options={cuentas.map((c) => ({ value: c.id, label: `${c.nombre} · ${c.tipo}` }))} /></Field>
             <Field label="Cuenta destino"><Select value={f.cuenta_destino} onChange={set("cuenta_destino")} placeholder="— Selecciona —" options={cuentas.map((c) => ({ value: c.id, label: `${c.nombre} · ${c.tipo}` }))} /></Field>
           </div>
@@ -78,6 +78,12 @@ function Transacciones() {
   const [del, setDel] = React.useState(null);
   const setFil = (k) => (v) => setFiltros((s) => ({ ...s, [k]: v }));
 
+  React.useEffect(() => {
+    const onNewTx = () => { setEditing(null); setDrawer(true); };
+    window.addEventListener("fin:new-tx", onNewTx);
+    return () => window.removeEventListener("fin:new-tx", onNewTx);
+  }, []);
+
   let list = S.getTransacciones(filtros);
   const cuentasMap = Object.fromEntries(S.getCuentas().map((c) => [c.id, c.nombre]));
   // sort
@@ -109,7 +115,7 @@ function Transacciones() {
         actions={<Button variant="primary" icon="plus" onClick={() => { setEditing(null); setDrawer(true); }}>Nueva transacción</Button>} />
 
       {/* resumen */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 14, marginBottom: 16 }}>
+      <div className="m-grid-2" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 14, marginBottom: 16 }}>
         <Card pad={15}><div style={{ fontSize: 11.5, color: "#888", marginBottom: 6 }}>Ingresos</div><div style={{ fontSize: 19, fontWeight: 600, fontFamily: "var(--mono)", color: "#10b981" }}>{fmtMoney(ingresos)}</div></Card>
         <Card pad={15}><div style={{ fontSize: 11.5, color: "#888", marginBottom: 6 }}>Gastos</div><div style={{ fontSize: 19, fontWeight: 600, fontFamily: "var(--mono)", color: "#ef4444" }}>{fmtMoney(gastos)}</div></Card>
         <Card pad={15}><div style={{ fontSize: 11.5, color: "#888", marginBottom: 6 }}>Ahorrado</div><div style={{ fontSize: 19, fontWeight: 600, fontFamily: "var(--mono)", color: "#22c55e" }}>{fmtMoney(ahorrado)}</div></Card>
@@ -137,7 +143,8 @@ function Transacciones() {
           <EmptyState icon="list" title="Sin transacciones" hint="No hay movimientos con estos filtros. Ajusta el periodo o crea una nueva transacción."
             action={<Button variant="primary" icon="plus" onClick={() => { setEditing(null); setDrawer(true); }}>Nueva transacción</Button>} />
         ) : (
-          <div style={{ overflowX: "auto" }}>
+          <>
+          <div className="tx-table" style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 720 }}>
               <thead><tr style={{ borderBottom: "1px solid var(--border)" }}>
                 <Th k="fecha">Fecha</Th><Th k="nombre">Nombre</Th><Th k="categoria">Categoría</Th><Th k="tipo">Tipo</Th>
@@ -169,6 +176,39 @@ function Transacciones() {
               </tbody>
             </table>
           </div>
+          {/* Cards móviles. Fallback inline display:none: si el CSS utilitario aún no está en Finanzas.html,
+              las cards no se muestran y desktop queda idéntico (solo la tabla). Cuando el shell agregue
+              .tx-cards { display:block !important } en ≤640px, el !important gana al inline y las activa. */}
+          <div className="tx-cards" style={{ display: "none" }}>
+            {list.map((t) => (
+              <div key={t.id} onClick={() => { setEditing(t); setDrawer(true); }}
+                style={{ padding: "12px 14px", borderBottom: "1px solid var(--border)", cursor: "pointer" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ fontSize: 11, fontFamily: "var(--mono)", color: "#888", marginBottom: 3 }}>{fmtDate(t.fecha)}</div>
+                    <div style={{ fontSize: 13.5, fontWeight: 500, color: "#eaeaea", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.nombre}</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4, fontSize: 12, color: "#bbb", flexWrap: "wrap" }}>
+                      <span style={{ width: 7, height: 7, borderRadius: 2, background: CAT_COLORS[t.categoria] || "#888", flexShrink: 0 }}></span>
+                      <span>{t.categoria}</span>
+                      <Badge color={TIPO_COLOR[t.tipo]}>{t.tipo}</Badge>
+                    </div>
+                  </div>
+                  <div style={{ textAlign: "right", flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+                    <div style={{ fontFamily: "var(--mono)", fontSize: 16, fontWeight: 600, whiteSpace: "nowrap", color: TIPO_COLOR[t.tipo] }}>
+                      {t.tipo === "Ingreso" ? "+" : (t.tipo === "Gasto" || t.tipo === "Pago de deuda" || t.tipo === "Ahorro") ? "−" : ""}{fmtMoney(t.monto)}
+                    </div>
+                    <button className="ibtn" onClick={(e) => { e.stopPropagation(); setDel(t); }} title="Eliminar"><Icon name="trash" size={14} /></button>
+                  </div>
+                </div>
+                <div style={{ marginTop: 6, fontSize: 11.5, color: "#999" }}>
+                  {t.tipo === "Transferencia" && t.cuenta_destino
+                    ? `${cuentasMap[t.cuenta] || "—"} → ${cuentasMap[t.cuenta_destino] || "—"}`
+                    : (t.cuenta ? cuentasMap[t.cuenta] || "—" : "—")}
+                </div>
+              </div>
+            ))}
+          </div>
+          </>
         )}
       </Card>
 

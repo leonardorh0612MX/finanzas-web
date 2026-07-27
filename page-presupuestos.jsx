@@ -19,7 +19,7 @@ function PresupuestoForm({ initial, mes, anio, onClose }) {
   return (
     <>
       <Field label="Nombre" error={err.nombre}><TextInput value={f.nombre} onChange={set("nombre")} placeholder="Ej. Comida del mes" /></Field>
-      <div style={{ display: "grid", gridTemplateColumns: subs.length ? "1fr 1fr" : "1fr", gap: 12 }}>
+      <div className="m-grid" style={{ display: "grid", gridTemplateColumns: subs.length ? "1fr 1fr" : "1fr", gap: 12 }}>
         <Field label="Categoría" hint={subs.length ? "" : "El gasto se calcula con las transacciones de esta categoría"}>
           <Select value={f.categoria} onChange={(v) => { set("categoria")(v); set("subcategoria")(""); }} options={S.getCategorias()} />
         </Field>
@@ -29,7 +29,7 @@ function PresupuestoForm({ initial, mes, anio, onClose }) {
         <Field label="Mes"><Select value={f.mes} onChange={(v) => set("mes")(+v)} options={Array.from({ length: 12 }, (_, i) => ({ value: i + 1, label: S.nombreMes[i + 1] }))} /></Field>
         <Field label="Año"><TextInput type="number" mono value={f.anio} onChange={(v) => set("anio")(+v)} /></Field>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+      <div className="m-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         <Field label="Monto límite (MXN)" error={err.presupuesto}><TextInput type="number" mono value={f.presupuesto} onChange={set("presupuesto")} placeholder="0.00" /></Field>
         <Field label="Tipo de gasto" hint="Fijo = obligación; Variable = gasto discrecional">
           <Select value={f.tipo} onChange={set("tipo")} options={[{ value: "Variable", label: "Variable" }, { value: "Fijo", label: "Fijo" }]} />
@@ -104,7 +104,7 @@ function Presupuestos() {
     <div>
       <PageHeader title="Presupuestos" subtitle={`${S.nombreMes[mes]} ${anio} · ${list.length} presupuesto${list.length !== 1 ? "s" : ""}`}
         actions={<>
-          <div style={{ display: "flex", gap: 8 }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <div style={{ width: 120 }}><Select value={mes} onChange={(v) => setMes(+v)} options={Array.from({ length: 12 }, (_, i) => ({ value: i + 1, label: S.nombreMes[i + 1] }))} /></div>
             <div style={{ width: 100 }}><Select value={anio} onChange={(v) => setAnio(+v)} options={[S.ANIO_ACTUAL - 1, S.ANIO_ACTUAL, S.ANIO_ACTUAL + 1].map((a) => ({ value: a, label: a }))} /></div>
           </div>
@@ -117,7 +117,7 @@ function Presupuestos() {
           action={<Button variant="primary" icon="plus" onClick={() => { setEditing(null); setDrawer(true); }}>Nuevo presupuesto</Button>} /></Card>
       ) : (
         <>
-          <div style={{ display: "grid", gridTemplateColumns: "1.1fr 1fr 1fr", gap: 14, marginBottom: 16 }} className="dash-2col">
+          <div style={{ display: "grid", gridTemplateColumns: "1.1fr 1fr 1fr", gap: 14, marginBottom: 16 }} className="dash-2col m-grid">
             <Card pad={15}><div style={{ fontSize: 11.5, color: "#888", marginBottom: 6 }}>Total presupuestado</div><div style={{ fontSize: 19, fontWeight: 600, fontFamily: "var(--mono)" }}>{fmtMoney(totalLim)}</div></Card>
             <Card pad={15}><div style={{ fontSize: 11.5, color: "#888", marginBottom: 6 }}>Total gastado</div><div style={{ fontSize: 19, fontWeight: 600, fontFamily: "var(--mono)", color: totalGas > totalLim ? "#ef4444" : "#eaeaea" }}>{fmtMoney(totalGas)}</div></Card>
             <Card pad={15}><div style={{ fontSize: 11.5, color: "#888", marginBottom: 6 }}>Disponible</div><div style={{ fontSize: 19, fontWeight: 600, fontFamily: "var(--mono)", color: totalLim - totalGas >= 0 ? "#10b981" : "#ef4444" }}>{fmtMoney(totalLim - totalGas)}</div></Card>

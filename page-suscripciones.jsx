@@ -54,7 +54,7 @@ function SuscripcionForm({ initial, onClose }) {
   return (
     <>
       <Field label="Nombre" error={err.nombre}><TextInput value={f.nombre} onChange={set("nombre")} placeholder="Ej. Netflix, Spotify…" /></Field>
-      <div style={{ display: "grid", gridTemplateColumns: subs.length ? "1fr 1fr" : "1fr", gap: 12 }}>
+      <div className="m-grid" style={{ display: "grid", gridTemplateColumns: subs.length ? "1fr 1fr" : "1fr", gap: 12 }}>
         <Field label="Categoría">
           <Select value={f.categoria} onChange={v => { set("categoria")(v); set("subcategoria")(""); }} options={S.getCategorias()} />
         </Field>
@@ -64,13 +64,13 @@ function SuscripcionForm({ initial, onClose }) {
           </Field>
         )}
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+      <div className="m-grid-2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         <Field label="Monto (MXN)" error={err.monto}><TextInput type="number" mono value={f.monto} onChange={set("monto")} placeholder="0.00" /></Field>
         <Field label="Frecuencia">
           <Select value={f.frecuencia} onChange={set("frecuencia")} options={FRECUENCIAS.map(v => ({ value: v, label: FREC_LABEL[v] }))} />
         </Field>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+      <div className="m-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         <Field label="Primer cobro" error={err.fecha_inicio} hint="Fecha del 1er cargo — los siguientes se calculan automáticamente">
           <TextInput type="date" value={f.fecha_inicio} onChange={set("fecha_inicio")} />
         </Field>
@@ -170,7 +170,7 @@ function Suscripciones() {
           action={<Button variant="primary" icon="plus" onClick={() => { setEditing(null); setDrawer(true); }}>Nueva suscripción</Button>} /></Card>
       ) : (
         <>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px,1fr))", gap: 14, marginBottom: 16 }}>
+          <div className="m-grid-2" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px,1fr))", gap: 14, marginBottom: 16 }}>
             <Card pad={15}>
               <div style={{ fontSize: 11.5, color: "#888", marginBottom: 6 }}>Gasto mensual</div>
               <div style={{ fontSize: 22, fontWeight: 600, fontFamily: "var(--mono)" }}>{fmtMoney(totalMes)}</div>

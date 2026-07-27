@@ -200,19 +200,46 @@
     return null;
   }
 
+  // POST silencioso al servidor (reconciliación, no bloquea la UI)
+  function pushToServer(db) {
+    try {
+      fetch("/api/db", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(db),
+      }).catch(() => {});
+    } catch (e) {}
+  }
+
   function load() {
-    // 1. Servidor → persiste aunque limpies caché o uses otro navegador
+    // 1. Obtener ambas fuentes: servidor y localStorage
     const fromServer = loadFromServer();
+    let fromLocal = null;
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) fromLocal = JSON.parse(raw);
+    } catch (e) {}
+
+    // 2. Ambos existen → gana el más nuevo por _savedAt (ISO compara lexicográficamente;
+    //    si falta en alguno se trata como más viejo → "")
+    if (fromServer && fromLocal) {
+      const sAt = fromServer._savedAt || "";
+      const lAt = fromLocal._savedAt || "";
+      if (lAt > sAt) {
+        // Local más nuevo → gana y reconcilia el servidor de inmediato
+        pushToServer(fromLocal);
+        return fromLocal;
+      }
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(fromServer)); } catch (e) {}
+      return fromServer;
+    }
+    // 3. Solo uno existe → úsalo
     if (fromServer) {
       try { localStorage.setItem(STORAGE_KEY, JSON.stringify(fromServer)); } catch (e) {}
       return fromServer;
     }
-    // 2. localStorage como respaldo
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) return JSON.parse(raw);
-    } catch (e) {}
-    // 3. Primera vez: store vacío (sin datos demo)
+    if (fromLocal) return fromLocal;
+    // 4. Primera vez: store vacío (sin datos demo)
     const fresh = emptyStore();
     save(fresh);
     return fresh;
@@ -220,6 +247,7 @@
 
   function save(db) {
     DB = db || DB;
+    DB._savedAt = new Date().toISOString();
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(DB)); } catch (e) {}
     // Persistir en servidor (no bloquea la UI)
     try {
@@ -248,6 +276,7 @@
       metas: [],
       transacciones: [],
       presupuestos: [],
+      prestamos: [],
       suscripciones: [],
     };
   }
@@ -260,7 +289,44 @@
   // inicializar después de declarar subs/notify (evita TDZ)
   DB = load();
   if (!DB.suscripciones) DB.suscripciones = [];
+  if (!DB.prestamos) DB.prestamos = [];
   procesarSuscripciones();
+
+  // ---- Re-sync automático (online / pestaña visible): gana el más nuevo ----
+  let _syncing = false;
+  function syncWithServer() {
+    if (_syncing) return;
+    _syncing = true;
+    try {
+      fetch("/api/db")
+        .then((res) => (res.ok ? res.json() : null))
+        .then((remote) => {
+          try {
+            if (remote && remote._nextId) {
+              const rAt = remote._savedAt || "";
+              const lAt = (DB && DB._savedAt) || "";
+              if (rAt > lAt) {
+                // Servidor más nuevo → reemplaza DB completo y re-render
+                DB = remote;
+                if (!DB.suscripciones) DB.suscripciones = [];
+                if (!DB.prestamos) DB.prestamos = [];
+                try { localStorage.setItem(STORAGE_KEY, JSON.stringify(DB)); } catch (e) {}
+                notify();
+              } else if (lAt > rAt) {
+                // Local más nuevo → reconcilia el servidor
+                pushToServer(DB);
+              }
+            }
+          } catch (e) {}
+          _syncing = false;
+        })
+        .catch(() => { _syncing = false; });
+    } catch (e) { _syncing = false; }
+  }
+  window.addEventListener("online", () => { syncWithServer(); });
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") syncWithServer();
+  });
 
   // -------------------- DERIVADOS --------------------
   function estadoPresupuesto(pct) {
@@ -694,8 +760,41 @@
     if (s) { s.activa = !s.activa; procesarSuscripciones(); }
   }
 
+  // -------------------- PRÉSTAMOS (dinero que me deben) --------------------
+  function prestamoConDerivados(p) {
+    const saldo_pendiente = money(Math.max(0, p.monto_total - p.cobrado));
+    const porcentaje = p.monto_total > 0 ? money((p.cobrado / p.monto_total) * 100) : 0;
+    const estado = porcentaje >= 100 ? "Cobrado" : "Activo";
+    return { ...p, saldo_pendiente, porcentaje, estado };
+  }
+  function getPrestamos() { return (DB.prestamos || []).map(prestamoConDerivados); }
+  function addPrestamo(d) {
+    const x = { id: nextId(), cobrado: 0, tasa_interes: 0, fecha_vencimiento: null, notas: "", ...d, monto_total: money(+d.monto_total) };
+    (DB.prestamos = DB.prestamos || []).push(x);
+    save(); return x;
+  }
+  function updatePrestamo(id, d) {
+    const i = (DB.prestamos || []).findIndex(x => x.id === id);
+    if (i >= 0) { DB.prestamos[i] = { ...DB.prestamos[i], ...d, monto_total: money(+d.monto_total) }; save(); }
+  }
+  function deletePrestamo(id) { DB.prestamos = (DB.prestamos || []).filter(x => x.id !== id); save(); }
+  function registrarCobroPrestamo(prestamoId, monto, fecha, cuentaId) {
+    const p = (DB.prestamos || []).find(x => x.id === prestamoId);
+    if (!p) return;
+    p.cobrado = money(Math.min(p.monto_total, p.cobrado + monto));
+    addTransaccion({ nombre: `Cobro: ${p.nombre}`, fecha, tipo: "Ingreso", monto: +monto, cuenta: cuentaId ? +cuentaId : null, categoria: "Otros", notas: `Cobro de préstamo a ${p.nombre}` });
+  }
+
   function addCuenta(d) { const { saldo, ...rest } = d; const x = { id: nextId(), activa: true, notas: "", ...rest, saldo_inicial: money(+saldo || 0) }; DB.cuentas.push(x); save(); return x; }
-  function updateCuenta(id, d) { const i = DB.cuentas.findIndex((x) => x.id === id); if (i >= 0) { const { saldo, saldo_inicial, saldo_actual, ...rest } = d; DB.cuentas[i] = { ...DB.cuentas[i], ...rest }; save(); } }
+  function updateCuenta(id, d) {
+    const i = DB.cuentas.findIndex((x) => x.id === id);
+    if (i >= 0) {
+      const { saldo_actual, ...rest } = d;
+      if (rest.saldo_inicial !== undefined) rest.saldo_inicial = money(+rest.saldo_inicial || 0);
+      DB.cuentas[i] = { ...DB.cuentas[i], ...rest };
+      save();
+    }
+  }
   function deleteCuenta(id) { DB.cuentas = DB.cuentas.filter((x) => x.id !== id); save(); }
   function toggleCuenta(id) { const c = DB.cuentas.find((x) => x.id === id); if (c) { c.activa = !c.activa; save(); } }
 
@@ -710,6 +809,7 @@
     addTransaccion, updateTransaccion, deleteTransaccion,
     addPresupuesto, updatePresupuesto, deletePresupuesto, copiarPresupuestos,
     addDeuda, updateDeuda, deleteDeuda, registrarPagoDeuda,
+    getPrestamos, addPrestamo, updatePrestamo, deletePrestamo, registrarCobroPrestamo,
     addMeta, updateMeta, deleteMeta,
     addCuenta, updateCuenta, deleteCuenta, toggleCuenta,
     estadoPresupuesto, estadoDeuda, estadoMeta,

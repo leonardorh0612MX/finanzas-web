@@ -22,7 +22,7 @@ function MetaForm({ initial, onClose }) {
     <>
       <Field label="Nombre" error={err.nombre}><TextInput value={f.nombre} onChange={set("nombre")} placeholder="Ej. Viaje a Japón" /></Field>
       <Field label="Tipo"><Select value={f.tipo} onChange={set("tipo")} options={["Ahorro", "Inversión", "Compra", "Viaje", "Emergencia", "Otro"]} /></Field>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+      <div className="m-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         <Field label="Monto objetivo (MXN)" error={err.monto_objetivo}><TextInput type="number" mono value={f.monto_objetivo} onChange={set("monto_objetivo")} placeholder="0.00" /></Field>
         <Field label="Monto actual (MXN)"><TextInput type="number" mono value={f.monto_actual} onChange={set("monto_actual")} placeholder="0.00" /></Field>
       </div>
@@ -131,7 +131,7 @@ function Metas() {
           action={<Button variant="primary" icon="plus" onClick={() => { setEditing(null); setDrawer(true); }}>Nueva meta</Button>} /></Card>
       ) : (
         <>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(310px, 1fr))", gap: 14, marginBottom: 16 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 14, marginBottom: 16 }}>
             {list.map((m) => <MetaCard key={m.id} m={m} onUpdate={() => setUpd(m)} onEdit={() => { setEditing(m); setDrawer(true); }} onDelete={() => setDel(m)} />)}
           </div>
           <ChartCard title="Comparativo de metas" subtitle="Progreso hacia cada objetivo">

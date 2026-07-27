@@ -20,7 +20,7 @@ function DeudaForm({ initial, onClose }) {
     <>
       <Field label="Nombre" error={err.nombre}><TextInput value={f.nombre} onChange={set("nombre")} placeholder="Ej. Tarjeta Nu" /></Field>
       <Field label="Tipo"><Select value={f.tipo} onChange={set("tipo")} options={["Tarjeta de crédito", "Préstamo personal", "Préstamo automotriz", "Crédito educativo", "Préstamo familiar", "Hipoteca", "Otro"]} /></Field>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+      <div className="m-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         <Field label="Monto total (MXN)" error={err.monto_total}><TextInput type="number" mono value={f.monto_total} onChange={set("monto_total")} placeholder="0.00" /></Field>
         <Field label="Tasa de interés (%)"><TextInput type="number" mono value={f.tasa_interes} onChange={set("tasa_interes")} placeholder="0.0" /></Field>
       </div>
@@ -93,7 +93,7 @@ function DeudaCard({ d, onPay, onEdit, onDelete }) {
 
       <ProgressBar pct={d.porcentaje} color={color} height={9} />
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(90px, 1fr))", gap: 8 }}>
         <div><div style={{ fontSize: 10.5, color: "#777", marginBottom: 2 }}>Total</div><div style={{ fontFamily: "var(--mono)", fontSize: 13, fontWeight: 600 }}>{fmtMoneyShort(d.monto_total)}</div></div>
         <div><div style={{ fontSize: 10.5, color: "#777", marginBottom: 2 }}>Pagado</div><div style={{ fontFamily: "var(--mono)", fontSize: 13, fontWeight: 600, color: "#10b981" }}>{fmtMoneyShort(d.pagado)}</div></div>
         <div><div style={{ fontSize: 10.5, color: "#777", marginBottom: 2 }}>Resta</div><div style={{ fontFamily: "var(--mono)", fontSize: 13, fontWeight: 600, color: "#f59e0b" }}>{fmtMoneyShort(d.saldo_restante)}</div></div>
@@ -155,7 +155,7 @@ function Deudas() {
             <ProgressBar pct={pctGlobal} color="#10b981" height={10} />
           </Card>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 14 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 14 }}>
             {list.map((d) => <DeudaCard key={d.id} d={d} onPay={() => setPago(d)} onEdit={() => { setEditing(d); setDrawer(true); }} onDelete={() => setDel(d)} />)}
           </div>
         </>

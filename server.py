@@ -9,8 +9,11 @@ Uso:
     → abre http://localhost:8765 automáticamente
 """
 
+import datetime
 import json
 import os
+import shutil
+import socket
 import threading
 import webbrowser
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -18,6 +21,8 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 PORT = 8765
 DATA_FILE = os.path.join(os.path.dirname(__file__), "finanzas_data.json")
 STATIC_DIR = os.path.dirname(__file__)
+BACKUP_DIR = os.path.join(os.path.dirname(__file__), "backups")
+BACKUP_KEEP = 14
 
 MIME = {
     ".html": "text/html; charset=utf-8",
@@ -27,7 +32,44 @@ MIME = {
     ".json": "application/json; charset=utf-8",
     ".png":  "image/png",
     ".ico":  "image/x-icon",
+    ".webmanifest": "application/manifest+json; charset=utf-8",
+    ".svg":  "image/svg+xml",
 }
+
+
+def backup_data_file():
+    """Copia finanzas_data.json a backups/finanzas_YYYY-MM-DD.json (uno por día).
+    Conserva solo los BACKUP_KEEP respaldos más recientes."""
+    if not os.path.isfile(DATA_FILE):
+        return
+    hoy = datetime.date.today().strftime("%Y-%m-%d")
+    dest = os.path.join(BACKUP_DIR, f"finanzas_{hoy}.json")
+    if os.path.exists(dest):
+        return  # ya se respaldó hoy
+    os.makedirs(BACKUP_DIR, exist_ok=True)
+    shutil.copy2(DATA_FILE, dest)
+    respaldos = sorted(
+        f for f in os.listdir(BACKUP_DIR)
+        if f.startswith("finanzas_") and f.endswith(".json")
+    )
+    for viejo in respaldos[:-BACKUP_KEEP]:
+        try:
+            os.remove(os.path.join(BACKUP_DIR, viejo))
+        except OSError:
+            pass
+
+
+def local_ip():
+    """Detecta la IP local (LAN) sin enviar datos: socket UDP 'conectado' a 8.8.8.8."""
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            s.connect(("8.8.8.8", 80))
+            return s.getsockname()[0]
+        finally:
+            s.close()
+    except OSError:
+        return None
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -44,6 +86,11 @@ class Handler(BaseHTTPRequestHandler):
         # API: devuelve datos guardados
         if path == "/api/db":
             self._send_json_file()
+            return
+
+        # API: health check (el frontend detecta si el servidor está accesible)
+        if path == "/api/health":
+            self._send(200, "application/json", b'{"ok":true}')
             return
 
         # Página raíz → Finanzas.html
@@ -69,6 +116,10 @@ class Handler(BaseHTTPRequestHandler):
             body = self.rfile.read(length)
             try:
                 data = json.loads(body)
+                try:
+                    backup_data_file()
+                except Exception:
+                    pass  # un respaldo fallido no debe impedir guardar
                 with open(DATA_FILE, "w", encoding="utf-8") as f:
                     json.dump(data, f, ensure_ascii=False)
                 self._send(200, "application/json", b'{"ok":true}')
@@ -117,6 +168,9 @@ if __name__ == "__main__":
     server = HTTPServer(("0.0.0.0", PORT), Handler)
     print(f"")
     print(f"  FinanzasOS arriba en:  http://localhost:{PORT}")
+    ip = local_ip()
+    if ip:
+        print(f"  Desde tu celular:  http://{ip}:{PORT}")
     print(f"  Datos guardados en:    finanzas_data.json")
     print(f"  Ctrl+C para cerrar")
     print(f"")

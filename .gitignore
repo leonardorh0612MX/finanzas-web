@@ -1,4 +1,6 @@
 finanzas_data.json
+backups/
+nul
 __pycache__/
 *.pyc
 .DS_Store
